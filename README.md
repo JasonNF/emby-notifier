@@ -136,11 +136,19 @@ settings:
 
 ---
 
-## 🖼️ 截图
+## 🖼️ 截图演示
 
 - **新节目的入库通知**  
 <p align="left"> <img src="./images/new_library_notify.png" alt="新节目的入库通知" width="300"> </p>  
 
+- **查看当前观看会话**  
+<p align="left"> <img src="./images/search_series.png" alt="新节目的入库通知" width="300"> </p>  
+
+- **搜索电视剧**  
+<p align="left"> <img src="./images/search_series.png" alt="新节目的入库通知" width="300"> </p>  
+
+- **搜索电影**  
+<p align="left"> <img src="./images/search_movie.png" alt="新节目的入库通知" width="300"> </p>  
 
 ---
 
