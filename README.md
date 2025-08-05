@@ -144,4 +144,12 @@ MIT License
 
 ---
 
+## 🔗 项目链接
+
+- 📦 GitHub: [https://github.com/xpisce/emby-notifier](https://github.com/xpisce/emby-notifier)
+- 🐳 Docker Hub: [https://hub.docker.com/r/xpisce/emby-notifier](https://hub.docker.com/r/xpisce/emby-notifier)
+
+
+---
+
 欢迎 Star ⭐ / Fork 🍴，有问题欢迎提 Issue 或 PR 🙌
