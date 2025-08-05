@@ -1,0 +1,29 @@
+telegram:
+  token: "123456:ABCDEF"  # Telegram Bot Token
+  chat_id: "-100xxxxxxxx" # 默认通知目标（私聊机器人/群组/频道 ID）
+  new_library_channel_id: "-100xxxxxxxx" # 媒体新增推送目标（如为频道）
+
+tmdb:
+  api_token: "your_tmdb_token"
+
+proxy:
+  http_proxy: "http://127.0.0.1:7890" # 代理服务器地址（HTTP协议）
+
+emby:
+  server_url: "http://192.168.1.100:8096"  # Emby服务器的内网访问地址
+  remote_url: "https://emby.yourdomain.com"  # Emby服务器的外网访问地址
+  api_key: "emby_api_key"  
+  user_id: "xxxxxxxx"  # 管理员用户的USER ID
+
+settings:
+  timezone: "Asia/Shanghai"
+  debounce_seconds: 10
+  media_base_path: "/media"  # 媒体文件所在的目录，比如“/media/国产剧/凡人修仙传 (2025)”就填写为/media
+  poster_cache_ttl_days: 30
+  allowed_group_id: "-100xxxxxxxx"  # 可选：用于限制机器人仅能被该群内成员使用
+  notification_events:             # 可开关各类事件通知
+    playback.start: true
+    playback.pause: true
+    playback.stop: true
+    library.new: true
+    library.deleted: true
