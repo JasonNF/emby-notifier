@@ -142,13 +142,16 @@ settings:
 <p align="left"> <img src="./images/new_library_notify.png" alt="新节目的入库通知" width="300"> </p>  
 
 - **查看当前观看会话**  
-<p align="left"> <img src="./images/status.png" alt="新节目的入库通知" width="300"> </p>  
+<p align="left"> <img src="./images/status.png" alt="查看当前观看会话" width="300"> </p>  
 
 - **搜索电视剧**  
-<p align="left"> <img src="./images/search_tv_series.png" alt="新节目的入库通知" width="300"> </p>  
+<p align="left"> <img src="./images/search_tv_series.png" alt="搜索电视剧" width="300"> </p>  
 
 - **搜索电影**  
-<p align="left"> <img src="./images/search_movie.png" alt="新节目的入库通知" width="300"> </p>  
+<p align="left"> <img src="./images/search_movie.png" alt="搜索电影" width="300"> </p>  
+
+- **管理通知**  
+<p align="left"> <img src="./images/notify_settings.png" alt="管理通知*" width="300"> </p>  
 
 ---
 
