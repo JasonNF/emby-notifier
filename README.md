@@ -139,7 +139,7 @@ settings:
 ## 🖼️ 截图
 
 - **新节目的入库通知**  
-<p align="center"> <img src="./images/new_library_notify.png" alt="新节目的入库通知" width="500"> </p>  
+<p align="left"> <img src="./images/new_library_notify.png" alt="新节目的入库通知" width="300"> </p>  
 
 
 ---
