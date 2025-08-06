@@ -1,29 +1,148 @@
-telegram:
-  token: "123456:ABCDEF"  # Telegram Bot Token
-  chat_id: "-100xxxxxxxx" # 默认通知目标（私聊机器人/群组/频道 ID）
-  new_library_channel_id: "-100xxxxxxxx" # 媒体新增推送目标（如为频道）
-
-tmdb:
-  api_token: "your_tmdb_token"
-
-proxy:
-  http_proxy: "http://127.0.0.1:7890" # 代理服务器地址（HTTP协议）
-
-emby:
-  server_url: "http://192.168.1.100:8096"  # Emby服务器的内网访问地址
-  remote_url: "https://emby.yourdomain.com"  # Emby服务器的外网访问地址
-  api_key: "emby_api_key"  
-  user_id: "xxxxxxxx"  # 管理员用户的USER ID
-
+# =======================================================
+# 机器人核心设置
+# =======================================================
 settings:
-  timezone: "Asia/Shanghai"
-  debounce_seconds: 10
-  media_base_path: "/media"  # 媒体文件所在的目录，比如“/media/国产剧/凡人修仙传 (2025)”就填写为/media
-  poster_cache_ttl_days: 30
-  allowed_group_id: "-100xxxxxxxx"  # 可选：用于限制机器人仅能被该群内成员使用
-  notification_events:             # 可开关各类事件通知
-    playback.start: true
-    playback.pause: true
-    playback.stop: true
-    library.new: true
-    library.deleted: true
+  # 推送内容设置：控制各类通知消息中显示哪些信息
+  content_settings:
+    # 新增节目通知内容设置
+    new_library_notification:
+      show_poster: true                       # 是否在通知中显示海报
+      show_media_detail: true                 # 是否显示节目标题和详情
+      media_detail_has_tmdb_link: true        # 是否在节目标题中添加 TMDB 链接
+      show_overview: true                     # 是否显示剧情简介
+      show_media_type: true                   # 是否显示节目类型（电影/剧集）
+      show_video_spec: true                   # 是否显示视频规格信息（分辨率、编码等）
+      show_audio_spec: true                   # 是否显示音频规格信息（语言、编码等）
+      show_timestamp: true                    # 是否显示节目入库时间
+      show_view_on_server_button: true        # 是否显示“在服务器中查看”按钮
+
+    # 观看状态反馈内容设置（/status 命令）
+    status_feedback:
+      show_poster: false                      # 是否在状态反馈中显示海报
+      show_player: true                       # 是否显示播放器名称
+      show_device: true                       # 是否显示播放设备名称
+      show_location: true                     # 是否显示用户IP及地理位置信息
+      show_media_detail: true                 # 是否显示节目标题和详情
+      media_detail_has_tmdb_link: true        # 是否在节目标题中添加 TMDB 链接
+      show_media_type: true                   # 是否显示节目类型
+      show_overview: false                    # 是否显示剧情简介
+      show_timestamp: true                    # 是否显示当前时间
+      show_view_on_server_button: true        # 是否显示“在服务器中查看”按钮
+      show_terminate_session_button: true     # 是否显示“终止会话”按钮
+      show_send_message_button: true          # 是否显示“发送消息”按钮
+      show_broadcast_button: true             # 是否显示“群发消息”按钮（当有多人观看时）
+      show_terminate_all_button: true         # 是否显示“终止所有”按钮（当有多人观看时）
+
+    # 播放行为推送内容设置（播放/暂停/停止通知）
+    playback_action:
+      show_poster: true                       # 是否在通知中显示海报
+      show_media_detail: true                 # 是否显示节目标题和详情
+      media_detail_has_tmdb_link: true        # 是否在节目标题中添加 TMDB 链接
+      show_user: true                         # 是否显示播放用户名
+      show_player: true                       # 是否显示播放器名称
+      show_device: true                       # 是否显示播放设备名称
+      show_location: true                     # 是否显示用户IP及地理位置信息
+      show_progress: true                     # 是否显示播放进度
+      show_video_spec: false                    # 是否显示视频规格信息
+      show_audio_spec: false                    # 是否显示音频规格信息
+      show_media_type: false                    # 是否显示节目类型
+      show_overview: false                    # 是否显示剧情简介
+      show_timestamp: true                    # 是否显示通知时间
+      show_view_on_server_button: true        # 是否显示“在服务器中查看”按钮
+
+    # 删除节目通知内容设置
+    library_deleted_notification:
+      show_poster: true                       # 是否在删除通知中显示海报
+      show_media_detail: true                 # 是否显示节目标题和详情
+      media_detail_has_tmdb_link: true        # 是否在节目标题中添加 TMDB 链接
+      show_overview: true                     # 是否显示剧情简介
+      show_media_type: true                   # 是否显示节目类型
+      show_timestamp: true                    # 是否显示删除时间
+
+    # 搜索结果展示内容设置（/search 命令）
+    search_display:
+      show_media_type_in_list: true           # 是否在搜索结果列表中显示节目类型（如：电影 | 剧集）
+      # 电影详情页展示设置
+      movie:
+        show_poster: true                     # 是否显示海报
+        title_has_tmdb_link: true             # 电影名称是否添加 TMDB 链接
+        show_type: true                       # 是否显示节目类型
+        show_category: true                   # 是否显示内容分类
+        show_overview: true                   # 是否显示剧情简介
+        show_video_spec: true                 # 是否显示视频规格
+        show_audio_spec: true                 # 是否显示音频规格
+        show_added_time: true                 # 是否显示入库时间
+        show_view_on_server_button: true      # 是否显示“在服务器中查看”按钮
+      # 剧集详情页展示设置
+      series:
+        show_poster: true                     # 是否显示海报
+        title_has_tmdb_link: true             # 剧集名称是否添加 TMDB 链接
+        show_type: true                       # 是否显示节目类型
+        show_category: true                   # 是否显示内容分类
+        show_overview: true                   # 是否显示剧情简介
+        show_view_on_server_button: true      # 是否显示“在服务器中查看”按钮
+        season_specs:
+          show_video_spec: true               # 是否显示每一季的视频规格
+          show_audio_spec: true               # 是否显示每一季的音频规格
+        update_progress:
+          show_latest_episode: true           # 是否显示已更新到最新一集
+          latest_episode_has_tmdb_link: true  # 最新一集是否添加 TMDB 链接
+          show_overview: true                 # 是否显示最新一集的剧情简介
+          show_added_time: true               # 是否显示最新一集的入库时间
+          show_progress_status: true          # 是否显示更新进度（如：已完结、剩余n集）
+
+  # 通知管理：控制哪些事件会发送通知，以及发送到哪个聊天
+  notification_management:
+    library_new:
+      to_group: true                          # 新增节目是否发送到群组
+      to_channel: true                        # 新增节目是否发送到频道
+      to_private: true                        # 新增节目是否发送到管理员私聊
+    playback_start: true                      # 是否发送“开始/继续播放”通知
+    playback_pause: true                      # 是否发送“暂停播放”通知
+    playback_stop: true                       # 是否发送“停止播放”通知
+    library_deleted: true                     # 是否发送“删除节目”通知
+
+  # 自动删除消息设置：控制哪些通知消息会在一段时间后自动删除
+  auto_delete_settings:
+    new_library:
+      to_group: false                         # 自动删除发送到群组的新增节目通知
+      to_channel: false                       # 自动删除发送到频道的新增节目通知
+      to_private: true                        # 自动删除发送到私聊的新增节目通知
+    library_deleted: true                     # 自动删除“删除节目”通知
+    playback_start: true                      # 自动删除“开始/继续播放”通知
+    playback_pause: true                      # 自动删除“暂停播放”通知
+    playback_stop: true                       # 自动删除“停止播放”通知
+
+  # 其他杂项设置
+  timezone: Asia/Shanghai                   # 服务器所在时区，用于格式化时间
+  debounce_seconds: 10                      # 播放事件防抖动时间，避免频繁通知
+  poster_cache_ttl_days: 7                  # TMDB海报URL的缓存有效期（天），避免重复请求
+  media_base_path: /opt/Media               # Emby媒体库根目录路径
+  allowed_group_id: '-1005547757'           # 允许机器人响应命令的群组ID，如果为空则任何群组都可使用
+
+# =======================================================
+# Emby服务器配置
+# =======================================================
+emby:
+  server_url: http://192.168.100.1:8096      # Emby服务器的内网或外网地址
+  api_key: 027cb516e7ab1d3024cf          # Emby API密钥
+  user_id: 6031e15347023541fb949             # 用于访问Emby媒体库的用户ID
+  remote_url: https://abc.example.com:8920  # Emby外部访问地址，用于生成“在服务器中查看”链接
+  app_scheme: emby                          # Emby APP的协议名称，用于生成APP内打开链接
+
+# =======================================================
+# Telegram机器人配置
+# =======================================================
+telegram:
+  token: 7969966:AAFYwUwrBpiHtashGGHkNBRyLC4 # Telegram机器人Token
+  group_id: '-10027355757'                   # 用于接收群组通知的群组ID
+  channel_id: '-10027657'                    # 用于接收频道通知的频道ID
+  admin_user_id: '7321438'                   # 管理员用户ID，用于接收私聊通知和执行管理命令
+
+# =======================================================
+# 第三方服务配置
+# =======================================================
+tmdb:
+  api_token: 09afa1139bebe95cb3c4           # TMDB API密钥
+proxy:
+  http_proxy: http://192.168.100.1:3333          # HTTP代理地址，如果需要访问外部服务（如TMDB、Telegram）
