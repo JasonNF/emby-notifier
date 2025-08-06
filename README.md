@@ -33,7 +33,8 @@
 
 ## ⚙️ 配置文件说明（config.yaml）
 
-以下为关键配置结构说明（完整字段详见示例配置）：
+📄 示例完整配置文件请参见：  
+👉 [config/config.yaml](https://github.com/xpisce/emby-notifier/blob/main/config/config.yaml)
 
 ### Emby 服务器设置
 
@@ -158,7 +159,10 @@ docker run -d \
 <p align="center"><img src="./images/status.png" alt="状态查看" width="300"></p>
 
 - **搜索电视剧/电影**  
-<p align="center"><img src="./images/search_tv_series.png" alt="搜索电视剧" width="300"> <img src="./images/search_movie.png" alt="搜索电影" width="300"></p>
+<p align="center">
+  <img src="./images/search_tv_series.png" alt="搜索电视剧" width="300">
+  <img src="./images/search_movie.png" alt="搜索电影" width="300">
+</p>
 
 - **交互式设置菜单**  
 <p align="center"><img src="./images/notify_settings.png" alt="通知设置" width="300"></p>
