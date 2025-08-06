@@ -33,22 +33,78 @@
 
 ## ⚙️ 配置文件说明（config.yaml）
 
-配置结构分为四大类：
+以下为关键配置结构说明（完整字段详见示例配置）：
 
-1. `emby`: Emby 服务器信息  
-2. `telegram`: Bot Token、目标聊天 ID、管理员 ID  
-3. `settings`: 展示内容、事件开关、消息撤回规则等  
-4. `tmdb/proxy`: 第三方服务配置
-
-<details>
-<summary>点击展开完整配置示例（config.yaml）</summary>
+### Emby 服务器设置
 
 ```yaml
-# 此处粘贴你提供的完整 config.yaml 示例
-（建议你将该段替换为缩略版，并单独将完整内容放入 docs/config.example.yaml）
+emby:
+  server_url: "http://192.168.100.1:8096"
+  api_key: "your_emby_api_key"
+  user_id: "your_emby_user_id"
+  remote_url: "https://emby.example.com"
+  app_scheme: "emby"
 ```
 
-</details>
+### Telegram Bot 设置
+
+```yaml
+telegram:
+  token: "your_telegram_bot_token"
+  group_id: "-100xxxxxxxx"
+  channel_id: "-100yyyyyyyy"
+  admin_user_id: "123456789"
+```
+
+### 内容展示控制（展示哪些字段、链接、规格等）
+
+```yaml
+settings:
+  content_settings:
+    new_library_notification:
+      show_poster: true
+      show_media_detail: true
+      media_detail_has_tmdb_link: true
+      show_overview: true
+      ...
+    status_feedback:
+      show_player: true
+      show_device: true
+      show_location: true
+      ...
+    search_display:
+      movie:
+        show_video_spec: true
+        show_audio_spec: true
+        ...
+```
+
+### 通知启用与投递设置
+
+```yaml
+notification_management:
+  library_new:
+    to_group: true
+    to_channel: true
+    to_private: true
+  playback_start: true
+  playback_pause: true
+  playback_stop: true
+  library_deleted: true
+```
+
+### 自动消息删除设置
+
+```yaml
+auto_delete_settings:
+  playback_start: true
+  playback_pause: true
+  playback_stop: true
+  new_library:
+    to_group: false
+    to_channel: false
+    to_private: true
+```
 
 ---
 
