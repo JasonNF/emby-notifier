@@ -95,25 +95,17 @@ docker run -d \
 
 ## 🖼️ 截图演示
 
-<p align="center">
-  <img src="./images/new_library_notify.png" width="320" alt="新增节目通知">
-</p>
+- **新增节目通知**  
+<p align="center"><img src="./images/new_library_notify.png" alt="新增节目通知" width="300"></p>
 
-<p align="center">
-  <img src="./images/status.png" width="320" alt="播放状态反馈">
-</p>
+- **Emby 在线播放状态查看**  
+<p align="center"><img src="./images/status.png" alt="状态查看" width="300"></p>
 
-<p align="center">
-  <img src="./images/search_tv_series.png" width="320" alt="搜索剧集">
-</p>
+- **搜索电视剧/电影**  
+<p align="center"><img src="./images/search_tv_series.png" alt="搜索电视剧" width="300"> <img src="./images/search_movie.png" alt="搜索电影" width="300"></p>
 
-<p align="center">
-  <img src="./images/search_movie.png" width="320" alt="搜索电影">
-</p>
-
-<p align="center">
-  <img src="./images/notify_settings.png" width="320" alt="通知设置面板">
-</p>
+- **交互式设置菜单**  
+<p align="center"><img src="./images/notify_settings.png" alt="通知设置" width="300"></p>
 
 ---
 
