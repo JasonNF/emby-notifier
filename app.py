@@ -1647,6 +1647,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     if latest_episode:
                         stream_details = get_media_stream_details(latest_episode.get('Id'), EMBY_USER_ID)
                 else:
+                    print("ℹ️ 新增项目为电影/其他，准备延时以等待Emby分析媒体源...")
+                    # 延时30秒，给Emby足够的时间来分析.strm文件。这个值可以根据您的服务器性能和网络情况进行调整。
+                    time.sleep(30)
                     stream_details = get_media_stream_details(item.get('Id'), None)
                     
                 parts = []
