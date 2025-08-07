@@ -153,10 +153,10 @@ docker run -d \
 ## 🖼️ 截图演示
 
 - **新增节目通知**  
-<p align="center">
-  <img src="./images/new_tv_episode.png" alt="新增剧集" width="300" style="margin-right: 100px;">
+<div style="display: flex; justify-content: center; gap: 20px;">
+  <img src="./images/new_tv_episode.png" alt="新增剧集" width="300">
   <img src="./images/new_movie.png" alt="新增电影" width="300">
-</p>
+</div>
 
 - **Emby 在线播放状态查看**  
 <p align="center"><img src="./images/status.png" alt="状态查看" width="300"></p>
