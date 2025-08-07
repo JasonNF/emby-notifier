@@ -154,7 +154,7 @@ docker run -d \
 
 - **新增节目通知**  
 <p align="center">
-  <img src="./images/new_tv_episode.png" alt="新增剧集" width="300" style="margin-right: 20px;">
+  <img src="./images/new_tv_episode.png" alt="新增剧集" width="300" style="margin-right: 40px;">
   <img src="./images/new_movie.png" alt="新增电影" width="300">
 </p>
 
@@ -163,13 +163,13 @@ docker run -d \
 
 - **搜索电视剧/电影**  
 <p align="center">
-  <img src="./images/search_tv_series.png" alt="搜索电视剧" width="300" style="margin-right: 20px;">
+  <img src="./images/search_tv_series.png" alt="搜索电视剧" width="300" style="margin-right: 40px;">
   <img src="./images/search_movie.png" alt="搜索电影" width="300">
 </p>
 
 - **交互式设置菜单**  
 <p align="center">
-  <img src="./images/settings_1.png" alt="通知设置" width="300" style="margin-right: 20px;">
+  <img src="./images/settings_1.png" alt="通知设置" width="300" style="margin-right: 40px;">
   <img src="./images/settings_2.png" alt="通知设置" width="300">
 </p>
 
