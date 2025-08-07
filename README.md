@@ -153,23 +153,23 @@ docker run -d \
 ## 🖼️ 截图演示
 
 - **新增节目通知**  
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="./images/new_tv_episode.png" alt="新增剧集" width="300">
+<p align="center">
+  <img src="./images/new_tv_episode.png" alt="新增剧集" width="300" style="margin-right: 20px;">
   <img src="./images/new_movie.png" alt="新增电影" width="300">
-</div>
+</p>
 
 - **Emby 在线播放状态查看**  
 <p align="center"><img src="./images/status.png" alt="状态查看" width="300"></p>
 
 - **搜索电视剧/电影**  
 <p align="center">
-  <img src="./images/search_tv_series.png" alt="搜索电视剧" width="300" style="margin-right: 100px;">
+  <img src="./images/search_tv_series.png" alt="搜索电视剧" width="300" style="margin-right: 20px;">
   <img src="./images/search_movie.png" alt="搜索电影" width="300">
 </p>
 
 - **交互式设置菜单**  
 <p align="center">
-  <img src="./images/settings_1.png" alt="通知设置" width="300" style="margin-right: 100px;">
+  <img src="./images/settings_1.png" alt="通知设置" width="300" style="margin-right: 20px;">
   <img src="./images/settings_2.png" alt="通知设置" width="300">
 </p>
 
