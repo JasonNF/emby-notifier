@@ -165,7 +165,11 @@ docker run -d \
 </p>
 
 - **交互式设置菜单**  
-<p align="center"><img src="./images/notify_settings.png" alt="通知设置" width="300"></p>
+<p align="center">
+  <img src="./images/settings_1.png" alt="通知设置" width="300">
+  <img src="./images/settings_2.png" alt="通知设置" width="300">
+  <img src="./images/settings_3.png" alt="通知设置" width="300">
+</p>
 
 ---
 
