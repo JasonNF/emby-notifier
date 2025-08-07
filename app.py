@@ -693,81 +693,131 @@ def get_active_sessions():
     return sessions
 
 def get_active_sessions_info(user_id):
-    """获取所有正在播放的会话的详细信息，并格式化为消息文本。"""
+    """
+    获取所有正在播放的会话的详细信息，并格式化为消息文本。
+    该函数首先查询所有活跃的Emby会话，然后为每个会话生成一个格式化的消息和内联按钮。
+    
+    Args:
+        user_id (str or int): 发起查询的用户ID。用于权限检查和回调数据。
+
+    Returns:
+        str or list: 如果没有活跃会话，返回一个字符串消息；否则返回一个包含
+                     每个会话详细信息的字典列表。每个字典包含'message', 'buttons'和'poster_url'。
+    """
     sessions = [s for s in get_active_sessions() if s.get('NowPlayingItem')]
+    
     if not sessions:
         print("ℹ️ 当前没有正在播放的会话。")
         return "✅ 当前无人观看 Emby。"
+    
     sessions_data = []
+    
+    # 打印调试信息以验证从Emby API获取的会话数量
+    print(f"DEBUG: get_active_sessions_info 发现了 {len(sessions)} 个会话。")
+    
     for session in sessions:
-        print(f"ℹ️ 正在处理会话: {session.get('Id')}")
-        item = session.get('NowPlayingItem', {})
-        session_user_id, session_id = session.get('UserId'), session.get('Id')
-        media_details = get_media_details(item, session_user_id)
-        tmdb_link, year = media_details.get('tmdb_link'), media_details.get('year')
-        raw_user_name = session.get('UserName', '未知用户')
-        raw_player = session.get('Client', '未知播放器')
-        raw_device = session.get('DeviceName', '未知设备')
-        ip_address = session.get('RemoteEndPoint', '').split(':')[0]
-        location = get_ip_geolocation(ip_address)
-        raw_location_str = f"{ip_address} {location}" if location != "局域网" else "局域网"
-        raw_title = item.get('SeriesName') if item.get('Type') == 'Episode' else item.get('Name', '未知标题')
-        year_str = f" ({year})" if year else ""
-        raw_episode_info = ""
-        if item.get('Type') == 'Episode':
-            s_num, e_num, e_name_raw = item.get('ParentIndexNumber'), item.get('IndexNumber'), item.get('Name')
-            if s_num is not None and e_num is not None:
-                raw_episode_info = f" S{s_num:02d}E{e_num:02d} {e_name_raw or ''}"
-            else:
-                raw_episode_info = f" {e_name_raw or ''}"
-        program_full_title_raw = f"{raw_title}{year_str}{raw_episode_info}"
-        session_lines = [
-            f"\n",
-            f"👤 *用户*: {escape_markdown(raw_user_name)}",
-            f"*{escape_markdown('─' * 20)}*"
-        ]
-        if get_setting('settings.content_settings.status_feedback.show_player'):
-            session_lines.append(f"播放器：{escape_markdown(raw_player)}")
-        if get_setting('settings.content_settings.status_feedback.show_device'):
-            session_lines.append(f"设备：{escape_markdown(raw_device)}")
-        if get_setting('settings.content_settings.status_feedback.show_location'):
-            session_lines.append(f"位置：{escape_markdown(raw_location_str)}")
-        if get_setting('settings.content_settings.status_feedback.show_media_detail'):
-            program_line = f"[{escape_markdown(program_full_title_raw)}]({tmdb_link})" if tmdb_link and get_setting('settings.content_settings.status_feedback.media_detail_has_tmdb_link') else escape_markdown(program_full_title_raw)
-            session_lines.append(f"节目：{program_line}")
-        pos_ticks, run_ticks = session.get('PlayState', {}).get('PositionTicks', 0), item.get('RunTimeTicks')
-        if run_ticks and run_ticks > 0:
-            percent = (pos_ticks / run_ticks) * 100
-            raw_progress_text = f"{percent:.1f}% ({format_ticks_to_hms(pos_ticks)} / {format_ticks_to_hms(run_ticks)})"
-            session_lines.append(f"进度：{escape_markdown(raw_progress_text)}")
-        raw_program_type = get_program_type_from_path(item.get('Path'))
-        if raw_program_type and get_setting('settings.content_settings.status_feedback.show_media_type'):
-            session_lines.append(f"节目类型：{escape_markdown(raw_program_type)}")
-        if get_setting('settings.content_settings.status_feedback.show_overview'):
-            overview = item.get('Overview', '')
-            if overview: session_lines.append(f"剧情: {escape_markdown(overview[:100] + '...')}")
-        if get_setting('settings.content_settings.status_feedback.show_timestamp'):
-            session_lines.append(f"时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
-        buttons = []
-        view_button_row = []
-        if EMBY_REMOTE_URL and get_setting('settings.content_settings.status_feedback.show_view_on_server_button'):
-            item_id, server_id = item.get('Id'), item.get('ServerId')
-            if item_id and server_id:
-                item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
-                view_button_row.append({'text': '▶️ 在服务器中查看', 'url': item_url})
-        if view_button_row: buttons.append(view_button_row)
-        action_button_row = []
-        if session_id:
-            if get_setting('settings.content_settings.status_feedback.show_terminate_session_button'):
-                action_button_row.append({'text': '❌ 终止会话', 'callback_data': f'session_terminate_{session_id}_{user_id}'})
-            if get_setting('settings.content_settings.status_feedback.show_send_message_button'):
-                action_button_row.append({'text': '💬 发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
-        if action_button_row: buttons.append(action_button_row)
-        sessions_data.append({
-            'message': "\n".join(session_lines),
-            'buttons': buttons if buttons else None,
-            'poster_url': media_details.get('poster_url') if get_setting('settings.content_settings.status_feedback.show_poster') else None
-        })
+        # 使用 try-except 块来处理单个会话数据可能存在的异常，确保程序不会中断
+        try:
+            item = session.get('NowPlayingItem', {})
+            session_user_id, session_id = session.get('UserId'), session.get('Id')
+            
+            # 检查关键数据是否存在，如果不存在则跳过此会话
+            if not item or not session_id:
+                print(f"⚠️ 警告: 跳过会话，因为它缺少 NowPlayingItem 或 ID。会话数据: {session}")
+                continue
+
+            print(f"ℹ️ 正在处理会话: {session_id}, 用户: {session.get('UserName')}")
+            
+            # 获取媒体详情（TMDB链接、海报等）
+            media_details = get_media_details(item, session_user_id)
+            tmdb_link, year = media_details.get('tmdb_link'), media_details.get('year')
+            
+            # 从会话数据中提取并格式化所需信息
+            raw_user_name = session.get('UserName', '未知用户')
+            raw_player = session.get('Client', '未知播放器')
+            raw_device = session.get('DeviceName', '未知设备')
+            ip_address = session.get('RemoteEndPoint', '').split(':')[0]
+            location = get_ip_geolocation(ip_address)
+            raw_location_str = f"{ip_address} {location}" if location != "局域网" else "局域网"
+            
+            raw_title = item.get('SeriesName') if item.get('Type') == 'Episode' else item.get('Name', '未知标题')
+            year_str = f" ({year})" if year else ""
+            
+            raw_episode_info = ""
+            if item.get('Type') == 'Episode':
+                s_num, e_num, e_name_raw = item.get('ParentIndexNumber'), item.get('IndexNumber'), item.get('Name')
+                if s_num is not None and e_num is not None:
+                    raw_episode_info = f" S{s_num:02d}E{e_num:02d} {e_name_raw or ''}"
+                else:
+                    raw_episode_info = f" {e_name_raw or ''}"
+            
+            program_full_title_raw = f"{raw_title}{year_str}{raw_episode_info}"
+            
+            # 构建消息文本列表
+            session_lines = [
+                f"\n",
+                f"👤 *用户*: {escape_markdown(raw_user_name)}",
+                f"*{escape_markdown('─' * 20)}*"
+            ]
+            if get_setting('settings.content_settings.status_feedback.show_player'):
+                session_lines.append(f"播放器：{escape_markdown(raw_player)}")
+            if get_setting('settings.content_settings.status_feedback.show_device'):
+                session_lines.append(f"设备：{escape_markdown(raw_device)}")
+            if get_setting('settings.content_settings.status_feedback.show_location'):
+                session_lines.append(f"位置：{escape_markdown(raw_location_str)}")
+            if get_setting('settings.content_settings.status_feedback.show_media_detail'):
+                program_line = f"[{escape_markdown(program_full_title_raw)}]({tmdb_link})" if tmdb_link and get_setting('settings.content_settings.status_feedback.media_detail_has_tmdb_link') else escape_markdown(program_full_title_raw)
+                session_lines.append(f"节目：{program_line}")
+                
+            pos_ticks, run_ticks = session.get('PlayState', {}).get('PositionTicks', 0), item.get('RunTimeTicks')
+            if run_ticks and run_ticks > 0:
+                percent = (pos_ticks / run_ticks) * 100
+                raw_progress_text = f"{percent:.1f}% ({format_ticks_to_hms(pos_ticks)} / {format_ticks_to_hms(run_ticks)})"
+                session_lines.append(f"进度：{escape_markdown(raw_progress_text)}")
+                
+            raw_program_type = get_program_type_from_path(item.get('Path'))
+            if raw_program_type and get_setting('settings.content_settings.status_feedback.show_media_type'):
+                session_lines.append(f"节目类型：{escape_markdown(raw_program_type)}")
+            if get_setting('settings.content_settings.status_feedback.show_overview'):
+                overview = item.get('Overview', '')
+                if overview: session_lines.append(f"剧情: {escape_markdown(overview[:100] + '...')}")
+            if get_setting('settings.content_settings.status_feedback.show_timestamp'):
+                session_lines.append(f"时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
+            
+            # 构建内联按钮
+            buttons = []
+            view_button_row = []
+            if EMBY_REMOTE_URL and get_setting('settings.content_settings.status_feedback.show_view_on_server_button'):
+                item_id, server_id = item.get('Id'), item.get('ServerId')
+                if item_id and server_id:
+                    item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
+                    view_button_row.append({'text': '▶️ 在服务器中查看', 'url': item_url})
+            if view_button_row: buttons.append(view_button_row)
+            
+            action_button_row = []
+            if session_id:
+                if get_setting('settings.content_settings.status_feedback.show_terminate_session_button'):
+                    action_button_row.append({'text': '❌ 终止会话', 'callback_data': f'session_terminate_{session_id}_{user_id}'})
+                if get_setting('settings.content_settings.status_feedback.show_send_message_button'):
+                    action_button_row.append({'text': '💬 发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
+            if action_button_row: buttons.append(action_button_row)
+            
+            # 将此会话的完整信息添加到列表中
+            sessions_data.append({
+                'message': "\n".join(session_lines),
+                'buttons': buttons if buttons else None,
+                'poster_url': media_details.get('poster_url') if get_setting('settings.content_settings.status_feedback.show_poster') else None
+            })
+
+        except Exception as e:
+            # 如果在处理某个会话时发生任何错误，打印警告并跳过该会话
+            print(f"❌ 处理会话 {session.get('Id')} 时发生错误: {e}")
+            traceback.print_exc()
+            continue
+
+    # 打印调试信息以验证最终返回的数据量
+    print(f"DEBUG: get_active_sessions_info 最终返回了 {len(sessions_data)} 条数据。")
+
     return sessions_data
 
 def terminate_emby_session(session_id, chat_id):
@@ -1229,15 +1279,24 @@ def handle_callback_query(callback_query):
         return
     message = callback_query.get('message', {})
     clicker_id, chat_id, message_id = callback_query['from']['id'], message['chat']['id'], message['message_id']
+    
+    # 尝试解析回调数据
     try:
         command, rest_of_data = data.split('_', 1)
-        main_data, initiator_id_str = rest_of_data.rsplit('_', 1)
-        initiator_id = int(initiator_id_str)
+        # 特殊处理没有 session_id 的命令
+        if rest_of_data.startswith('terminateall') or rest_of_data.startswith('broadcast'):
+            main_data, initiator_id_str = rest_of_data.rsplit('_', 1)
+            initiator_id = int(initiator_id_str)
+        else:
+            # 兼容旧的会话类命令
+            main_data, initiator_id_str = rest_of_data.rsplit('_', 1)
+            initiator_id = int(initiator_id_str)
     except (ValueError, IndexError) as e:
         print(f"❌ 错误：无法解析回调数据: {data}。错误: {e}")
         answer_callback_query(query_id, text="发生了一个内部错误。", show_alert=True)
         return
 
+    # 权限检查：只有发起者和管理员可以操作
     if clicker_id != initiator_id:
         answer_callback_query(query_id, text="交互由其他用户发起，您无法操作！", show_alert=True)
         print(f"⚠️ 拒绝非发起者 ({clicker_id}) 的回调操作。")
@@ -1248,7 +1307,8 @@ def handle_callback_query(callback_query):
         answer_callback_query(query_id, text="抱歉，此操作仅对超级管理员开放。", show_alert=True)
         print(f"🚫 拒绝非管理员 ({clicker_id}) 的管理员回调操作。")
         return
-        
+    
+    # === 菜单和搜索功能处理，保持不变 ===
     if command == 'n':
         menu_key = main_data
         answer_callback_query(query_id)
@@ -1287,7 +1347,57 @@ def handle_callback_query(callback_query):
             answer_callback_query(query_id, text="正在获取详细信息...")
             send_search_detail(chat_id, search_id, item_index, initiator_id)
         return
+        
+    # === 播放会话管理功能处理 ===
     if command == 'session':
+        # 处理“终止所有会话”和“群发消息”的确认或等待输入
+        if main_data == 'terminateall':
+            answer_callback_query(query_id)
+            confirmation_buttons = [[
+                {'text': '⚠️ 是的，全部终止', 'callback_data': f'session_terminateall_confirm_{initiator_id}'},
+                {'text': '取消', 'callback_data': f'action_cancel_{initiator_id}'}
+            ]]
+            edit_telegram_message(chat_id, message_id, escape_markdown("❓ 您确定要终止*所有*正在播放的会话吗？此操作无法撤销。"), inline_buttons=confirmation_buttons)
+            return
+        
+        if main_data == 'broadcast':
+            answer_callback_query(query_id)
+            user_context[chat_id] = {'state': 'awaiting_broadcast_message', 'initiator_id': initiator_id}
+            prompt_text = "✍️ 请输入您想*群发*给所有用户的消息内容："
+            if chat_id < 0:
+                prompt_text = "✍️ *请回复本消息*，输入您想*群发*给所有用户的消息内容："
+            send_deletable_telegram_notification(escape_markdown(prompt_text), chat_id=chat_id, delay_seconds=60)
+            return
+
+        # 处理确认终止所有会话
+        if main_data == 'terminateall_confirm':
+            answer_callback_query(query_id, text="正在终止所有会话...", show_alert=False)
+            
+            # --- 关键的过滤逻辑 ---
+            # 获取所有活跃会话，并只保留正在播放内容的会话
+            sessions_to_terminate = [s for s in get_active_sessions() if s.get('NowPlayingItem')]
+            
+            count = 0
+            if not sessions_to_terminate:
+                edit_telegram_message(chat_id, message_id, "✅ 当前已无活跃会话，无需操作。")
+            else:
+                for session in sessions_to_terminate:
+                    session_id = session.get('Id')
+                    if session_id and terminate_emby_session(session_id, None):
+                        count += 1
+                edit_telegram_message(chat_id, message_id, f"✅ 操作完成，共终止了 {count} 个会话。")
+            delete_user_message_later(chat_id, message_id, delay_seconds=60)
+            return
+
+        # 处理取消操作
+        if main_data == 'action_cancel':
+            answer_callback_query(query_id)
+            original_text = message.get('text', '操作已取消')
+            edit_telegram_message(chat_id, message_id, f"~~{original_text}~~\n\n✅ 操作已取消。")
+            delete_user_message_later(chat_id, message_id, delay_seconds=60)
+            return
+            
+        # 兼容旧的会话操作
         action, session_id = main_data.split('_', 1)
         if action == 'terminate':
             answer_callback_query(query_id)
@@ -1297,7 +1407,7 @@ def handle_callback_query(callback_query):
                 answer_callback_query(query_id, text="❌ 终止失败。", show_alert=True)
         elif action == 'message':
             answer_callback_query(query_id)
-            user_context[chat_id] = {'state': 'awaiting_message_for_session', 'session_id': session_id}
+            user_context[chat_id] = {'state': 'awaiting_message_for_session', 'session_id': session_id, 'initiator_id': initiator_id}
             prompt_text = "✍️ 请输入您想发送给该用户的消息内容："
             if chat_id < 0:
                 prompt_text = "✍️ *请回复本消息*，输入您想发送给该用户的消息内容："
@@ -1305,7 +1415,6 @@ def handle_callback_query(callback_query):
         return
         
 def handle_telegram_command(message):
-    """处理来自Telegram的消息和命令。"""
     msg_text, chat_id, user_id = message.get('text', '').strip(), message['chat']['id'], message['from']['id']
     print(f"➡️ 收到来自用户 {user_id} 在 Chat ID {chat_id} 的命令: {msg_text}")
 
@@ -1317,7 +1426,7 @@ def handle_telegram_command(message):
     is_reply = 'reply_to_message' in message
     mention = f"@{message['from'].get('username')} " if is_group_chat and message['from'].get('username') else ""
     is_awaiting_input = chat_id in user_search_state or chat_id in user_context
-
+    
     if is_awaiting_input:
         is_bot_command = msg_text.startswith('/')
         if is_bot_command:
@@ -1334,12 +1443,41 @@ def handle_telegram_command(message):
                     print(f"🔍 用户 {user_id} 发起了搜索: {msg_text}")
                     send_search_emby_and_format(msg_text, chat_id, user_id, is_group_chat, mention)
                     return
-                elif chat_id in user_context and user_context[chat_id].get('state') == 'awaiting_message_for_session':
-                    session_id_to_send = user_context[chat_id]['session_id']
-                    del user_context[chat_id]
-                    print(f"✉️ 用户 {user_id} 回复了消息，发送给会话 {session_id_to_send}: {msg_text}")
-                    send_message_to_emby_session(session_id_to_send, msg_text, chat_id)
-                    return
+                elif chat_id in user_context:
+                    context = user_context.get(chat_id, {})
+                    state = context.get('state')
+                    
+                    if context.get('initiator_id') is not None and context['initiator_id'] != user_id:
+                        return
+
+                    if state == 'awaiting_message_for_session':
+                        session_id_to_send = context['session_id']
+                        del user_context[chat_id]
+                        print(f"✉️ 用户 {user_id} 回复了消息，发送给会话 {session_id_to_send}: {msg_text}")
+                        send_message_to_emby_session(session_id_to_send, msg_text, chat_id)
+                        return
+                    elif state == 'awaiting_broadcast_message':
+                        del user_context[chat_id]
+                        
+                        # === 修复群发消息的逻辑 ===
+                        # 重新获取活跃会话，并只保留正在播放的会话
+                        sessions_to_broadcast = [s for s in get_active_sessions() if s.get('NowPlayingItem')]
+                        
+                        if not sessions_to_broadcast:
+                            send_simple_telegram_message("当前无人观看，无需群发。", chat_id)
+                        else:
+                            count = 0
+                            for session in sessions_to_broadcast:
+                                session_id = session.get('Id')
+                                if session_id:
+                                    # 注意这里 send_message_to_emby_session 的 chat_id 应该传 None，
+                                    # 以避免在群发失败时向你自己的私聊发送多条失败消息。
+                                    send_message_to_emby_session(session_id, msg_text, None)
+                                    count += 1
+                            send_simple_telegram_message(f"✅ 已向 {count} 个会话发送群发消息。", chat_id)
+                        return
+            else:
+                return
 
     if '@' in msg_text: msg_text = msg_text.split('@')[0]
     if not msg_text.startswith('/'): return
