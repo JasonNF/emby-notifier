@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import uuid
 from functools import reduce
 import operator
+import traceback
 
 
 POSTER_CACHE = {}
@@ -159,6 +160,7 @@ def build_toggle_maps():
             }
             SETTINGS_MENU_STRUCTURE[key]['index'] = index
             index += 1
+    print("⚙️ 设置菜单键值映射已构建。")
 
 def _build_default_settings():
     defaults = {}
@@ -180,7 +182,7 @@ def get_setting(path_str):
         try:
             return reduce(operator.getitem, path_str.split('.'), DEFAULT_SETTINGS)
         except (KeyError, TypeError):
-            print(f"警告: 在用户配置和默认配置中都找不到键: {path_str}")
+            print(f"⚠️ 警告: 在用户配置和默认配置中都找不到键: {path_str}")
             return None
 
 def set_setting(path_str, value):
@@ -203,21 +205,25 @@ def merge_configs(user_config, default_config):
 
 def load_config():
     global CONFIG
+    print(f"📝 尝试加载配置文件：{CONFIG_PATH}")
     try:
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             user_config = yaml.safe_load(f) or {}
         CONFIG = merge_configs(user_config, DEFAULT_SETTINGS)
+        print("✅ 配置文件加载成功。")
     except FileNotFoundError:
-        print(f"警告：配置文件 {CONFIG_PATH} 未找到。将使用内置的默认设置。")
+        print(f"⚠️ 警告：配置文件 {CONFIG_PATH} 未找到。将使用内置的默认设置。")
         CONFIG = DEFAULT_SETTINGS
     except Exception as e:
-        print(f"错误：读取或解析配置文件失败: {e}")
+        print(f"❌ 错误：读取或解析配置文件失败: {e}")
         exit(1)
 
 def save_config():
+    print(f"💾 尝试保存配置文件：{CONFIG_PATH}")
     try:
         with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
             yaml.dump(CONFIG, f, allow_unicode=True, sort_keys=False)
+        print("✅ 配置文件保存成功。")
     except Exception as e:
         print(f"❌ 保存配置失败: {e}")
 
@@ -229,6 +235,7 @@ def load_language_map():
         'kor': {'en': 'Korean', 'zh': '韩语'}, 'und': {'en': 'Undetermined', 'zh': '未知'},
         'mis': {'en': 'Multiple languages', 'zh': '多语言'}
     }
+    print(f"🌍 尝试加载语言配置文件：{LANG_MAP_PATH}")
     if not os.path.exists(LANG_MAP_PATH):
         print(f"⚠️ 警告：语言配置文件 {LANG_MAP_PATH} 未找到，将使用内置的精简版语言列表。")
         LANG_MAP = fallback_map
@@ -236,27 +243,33 @@ def load_language_map():
     try:
         with open(LANG_MAP_PATH, 'r', encoding='utf-8') as f:
             LANG_MAP = json.load(f)
+        print("✅ 语言配置文件加载成功。")
     except Exception as e:
         print(f"❌ 加载语言配置文件失败: {e}，将使用内置的精简版语言列表。")
         LANG_MAP = fallback_map
 
 def load_poster_cache():
     global POSTER_CACHE
+    print(f"🖼️ 尝试加载海报缓存：{POSTER_CACHE_PATH}")
     if not os.path.exists(POSTER_CACHE_PATH):
         POSTER_CACHE = {}
+        print("⚠️ 海报缓存文件不存在，使用空缓存。")
         return
     try:
         with open(POSTER_CACHE_PATH, 'r', encoding='utf-8') as f:
             POSTER_CACHE = json.load(f)
+        print("✅ 海报缓存加载成功。")
     except (json.JSONDecodeError, FileNotFoundError) as e:
         print(f"❌ 加载海报缓存失败: {e}，将使用空缓存。")
         POSTER_CACHE = {}
 
 def save_poster_cache():
+    print(f"💾 尝试保存海报缓存：{POSTER_CACHE_PATH}")
     try:
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(POSTER_CACHE_PATH, 'w', encoding='utf-8') as f:
             json.dump(POSTER_CACHE, f, indent=4)
+        print("✅ 海报缓存保存成功。")
     except Exception as e:
         print(f"❌ 保存海报缓存失败: {e}")
 
@@ -289,6 +302,7 @@ ALLOWED_GROUP_ID = GROUP_ID
 if not TELEGRAM_TOKEN or not ADMIN_USER_ID:
     print("错误：TELEGRAM_TOKEN 或 ADMIN_USER_ID 未在 config.yaml 中正确设置")
     exit(1)
+print("🚀 初始化完成。")
 
 def make_request_with_retry(method, url, max_retries=3, retry_delay=1, **kwargs):
     api_name = "Unknown API"
@@ -299,16 +313,18 @@ def make_request_with_retry(method, url, max_retries=3, retry_delay=1, **kwargs)
     attempts = 0
     while attempts < max_retries:
         try:
+            print(f"🌐 正在进行 {api_name} API 请求 (第 {attempts + 1} 次), URL: {url.split('?')[0]}")
             response = requests.request(method, url, **kwargs)
             if 200 <= response.status_code < 300:
+                print(f"✅ {api_name} API 请求成功，状态码: {response.status_code}")
                 return response
             else:
                 error_text = response.text
                 if "message is not modified" in error_text:
-                    print(f"INFO: Telegram 消息未被修改，无需操作。")
+                    print(f"ℹ️ Telegram 消息未被修改，无需操作。")
                     return None
                 if "BUTTON_DATA_INVALID" in error_text:
-                    print(f"ERROR: Telegram报告按钮数据无效。请检查回调数据长度是否超过64字节。")
+                    print(f"❌ Telegram 报告按钮数据无效。请检查回调数据长度是否超过64字节。")
                     return None
                 print(f"❌ {api_name} API 请求失败 (第 {attempts + 1} 次)，URL: {url.split('?')[0]}, 状态码: {response.status_code}, 响应: {error_text}")
         except requests.exceptions.RequestException as e:
@@ -371,6 +387,7 @@ def get_ip_geolocation(ip):
     return "未知位置"
 
 def search_tmdb_by_title(title, year=None, media_type='tv'):
+    print(f"🔍 正在 TMDB 搜索: {title} ({year})")
     if not TMDB_API_TOKEN: return None
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
     params = {'api_key': TMDB_API_TOKEN, 'query': title, 'language': 'zh-CN'}
@@ -381,23 +398,30 @@ def search_tmdb_by_title(title, year=None, media_type='tv'):
     if response:
         results = response.json().get('results', [])
         if not results:
+            print(f"❌ TMDB 未找到匹配结果。")
             return None
         exact_match = next((item for item in results if (item.get('name') or item.get('title')) == title), None)
         if exact_match:
+            print(f"✅ 找到精确匹配: {exact_match.get('name') or exact_match.get('title')}, ID: {exact_match.get('id')}")
             return exact_match.get('id')
         else:
             results.sort(key=lambda x: (x.get('popularity', 0)), reverse=True)
-            return results[0].get('id')
+            popular_match = results[0]
+            print(f"⚠️ 未找到精确匹配，返回最热门结果: {popular_match.get('name') or popular_match.get('title')}, ID: {popular_match.get('id')}")
+            return popular_match.get('id')
     print(f"❌ TMDB 搜索失败")
     return None
 
 def get_media_details(item, user_id):
     details = {'poster_url': None, 'tmdb_link': None, 'year': None, 'tmdb_id': None}
     if not TMDB_API_TOKEN:
+        print("⚠️ 未配置 TMDB_API_TOKEN，跳过获取节目详情。")
         return details
     item_type = item.get('Type')
     tmdb_id, api_type = None, None
     details['year'] = item.get('ProductionYear') or extract_year_from_path(item.get('Path'))
+    print(f"ℹ️ 正在获取项目 {item.get('Name')} ({item.get('Id')}) 的媒体详情。类型: {item_type}")
+
     if item_type == 'Movie':
         api_type = 'movie'
         tmdb_id = item.get('ProviderIds', {}).get('Tmdb')
@@ -413,6 +437,7 @@ def get_media_details(item, user_id):
         series_provider_ids = item.get('SeriesProviderIds', {}) or item.get('Series', {}).get('ProviderIds', {})
         tmdb_id = series_provider_ids.get('Tmdb')
         if not tmdb_id and item.get('SeriesId'):
+            print(f"⚠️ 无法从 Episode 获取 TMDB ID，尝试从 SeriesId ({item.get('SeriesId')}) 获取。")
             series_id = item.get('SeriesId')
             request_user_id = user_id or EMBY_USER_ID
             url_part = f"/Users/{request_user_id}/Items/{series_id}" if request_user_id else f"/Items/{series_id}"
@@ -421,6 +446,7 @@ def get_media_details(item, user_id):
             if response:
                 tmdb_id = response.json().get('ProviderIds', {}).get('Tmdb')
         if not tmdb_id:
+            print(f"⚠️ 仍然没有 TMDB ID，尝试通过标题搜索 TMDB。")
             tmdb_id = search_tmdb_by_title(item.get('SeriesName'), details.get('year'), media_type='tv')
         if tmdb_id:
             season_num, episode_num = item.get('ParentIndexNumber'), item.get('IndexNumber')
@@ -435,6 +461,7 @@ def get_media_details(item, user_id):
             cached_time = datetime.fromisoformat(cached_item['timestamp'])
             if datetime.now() - cached_time < timedelta(days=POSTER_CACHE_TTL_DAYS):
                 details['poster_url'] = cached_item['url']
+                print(f"✅ 从缓存获取到 TMDB ID {tmdb_id} 的海报链接。")
                 return details
         url = f"https://api.themoviedb.org/3/{api_type}/{tmdb_id}?api_key={TMDB_API_TOKEN}&language=zh-CN"
         proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
@@ -445,12 +472,14 @@ def get_media_details(item, user_id):
                 details['poster_url'] = f"https://image.tmdb.org/t/p/w500{poster_path}"
                 POSTER_CACHE[tmdb_id] = {'url': details['poster_url'], 'timestamp': datetime.now().isoformat()}
                 save_poster_cache()
+                print(f"✅ 成功从 TMDB 获取并缓存海报。")
     return details
 
 def send_telegram_notification(text, photo_url=None, chat_id=None, inline_buttons=None, disable_preview=False):
     if not chat_id:
-        print("错误：未指定 chat_id。")
+        print("❌ 错误：未指定 chat_id。")
         return
+    print(f"💬 正在向 Chat ID {chat_id} 发送 Telegram 通知...")
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
     api_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/" + ('sendPhoto' if photo_url else 'sendMessage')
     payload = {'chat_id': chat_id, 'parse_mode': 'MarkdownV2', 'disable_web_page_preview': disable_preview}
@@ -477,6 +506,7 @@ def send_deletable_telegram_notification(text, photo_url=None, chat_id=None, inl
             payload['photo'], payload['caption'] = photo_url, text
         else:
             payload['text'] = text
+        print(f"💬 正在向 Chat ID {chat_id} 发送可删除的通知，{delay_seconds}秒后删除。")
         response = make_request_with_retry('POST', api_url, data=payload, timeout=20, proxies=proxies)
         if not response:
             return
@@ -485,6 +515,7 @@ def send_deletable_telegram_notification(text, photo_url=None, chat_id=None, inl
         if not message_id or delay_seconds <= 0:
             return
         await asyncio.sleep(delay_seconds)
+        print(f"⏳ 正在删除消息 ID: {message_id}。")
         delete_url = api_url_base + 'deleteMessage'
         delete_payload = {'chat_id': chat_id, 'message_id': message_id}
         del_response = make_request_with_retry('POST', delete_url, data=delete_payload, timeout=10, proxies=proxies, max_retries=5, retry_delay=5)
@@ -498,6 +529,7 @@ def send_simple_telegram_message(text, chat_id=None, delay_seconds=60):
     send_deletable_telegram_notification(text, chat_id=target_chat_id, delay_seconds=delay_seconds)
 
 def answer_callback_query(callback_query_id, text=None, show_alert=False):
+    print(f"🔘 回答回调查询: {callback_query_id}")
     params = {'callback_query_id': callback_query_id, 'show_alert': show_alert}
     if text: params['text'] = text
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
@@ -505,6 +537,7 @@ def answer_callback_query(callback_query_id, text=None, show_alert=False):
     make_request_with_retry('POST', url, params=params, timeout=5, proxies=proxies)
 
 def edit_telegram_message(chat_id, message_id, text, inline_buttons=None, disable_preview=False):
+    print(f"✏️ 正在编辑 Chat ID {chat_id}, Message ID {message_id} 的消息。")
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText"
     payload = {'chat_id': chat_id, 'message_id': message_id, 'text': text, 'parse_mode': 'MarkdownV2', 'disable_web_page_preview': disable_preview}
@@ -513,6 +546,7 @@ def edit_telegram_message(chat_id, message_id, text, inline_buttons=None, disabl
     make_request_with_retry('POST', url, json=payload, timeout=10, proxies=proxies)
 
 def delete_telegram_message(chat_id, message_id):
+    print(f"🗑️ 正在删除 Chat ID {chat_id}, Message ID {message_id} 的消息。")
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
     payload = {'chat_id': chat_id, 'message_id': message_id}
@@ -526,8 +560,10 @@ def delete_user_message_later(chat_id, message_id, delay_seconds=60):
     
 def is_super_admin(user_id):
     if not ADMIN_USER_ID:
+        print("⚠️ 未配置 ADMIN_USER_ID，所有用户都将无法执行管理员操作。")
         return False
-    return str(user_id) == str(ADMIN_USER_ID)
+    is_admin = str(user_id) == str(ADMIN_USER_ID)
+    return is_admin
 
 def is_user_authorized(user_id):
     if is_super_admin(user_id):
@@ -536,7 +572,9 @@ def is_user_authorized(user_id):
         return False
     now = time.time()
     if user_id in GROUP_MEMBER_CACHE and (now - GROUP_MEMBER_CACHE[user_id]['timestamp'] < 3600):
+        print(f"👥 用户 {user_id} 授权状态从缓存获取：{GROUP_MEMBER_CACHE[user_id]['is_member']}")
         return GROUP_MEMBER_CACHE[user_id]['is_member']
+    print(f"👥 正在查询用户 {user_id} 在群组 {GROUP_ID} 中的成员身份。")
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember"
     params = {'chat_id': GROUP_ID, 'user_id': user_id}
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
@@ -546,9 +584,11 @@ def is_user_authorized(user_id):
         status = result.get('status')
         if status in ['creator', 'administrator', 'member', 'restricted']:
             GROUP_MEMBER_CACHE[user_id] = {'is_member': True, 'timestamp': now}
+            print(f"✅ 用户 {user_id} 验证通过。")
             return True
         else:
             GROUP_MEMBER_CACHE[user_id] = {'is_member': False, 'timestamp': now}
+            print(f"❌ 用户 {user_id} 验证失败，状态: {status}。")
             return False
     else:
         print(f"⚠️ 警告：查询用户 {user_id} 的群成员身份失败。本次将临时放行。")
@@ -578,19 +618,25 @@ def is_bot_admin(chat_id, user_id):
         return False
 
 def get_active_sessions():
+    print("🎬 正在查询 Emby 活跃会话。")
     if not EMBY_SERVER_URL or not EMBY_API_KEY:
+        print("❌ 缺少 Emby 服务器配置，无法查询会话。")
         return []
     url = f"{EMBY_SERVER_URL}/Sessions"
     params = {'api_key': EMBY_API_KEY, 'activeWithinSeconds': 360}
     response = make_request_with_retry('GET', url, params=params, timeout=15)
-    return [s for s in response.json()] if response else []
+    sessions = response.json() if response else []
+    print(f"✅ 查询到 {len(sessions)} 个活跃会话。")
+    return sessions
 
 def get_active_sessions_info(user_id):
     sessions = [s for s in get_active_sessions() if s.get('NowPlayingItem')]
     if not sessions:
+        print("ℹ️ 当前没有正在播放的会话。")
         return "✅ 当前无人观看 Emby。"
     sessions_data = []
     for session in sessions:
+        print(f"ℹ️ 正在处理会话: {session.get('Id')}")
         item = session.get('NowPlayingItem', {})
         session_user_id, session_id = session.get('UserId'), session.get('Id')
         media_details = get_media_details(item, session_user_id)
@@ -661,6 +707,7 @@ def get_active_sessions_info(user_id):
     return sessions_data
 
 def terminate_emby_session(session_id, chat_id):
+    print(f"🛑 正在尝试终止会话: {session_id}")
     if not all([EMBY_SERVER_URL, EMBY_API_KEY, session_id]):
         if chat_id: send_simple_telegram_message("错误：缺少终止会话所需的服务器配置。", chat_id)
         return False
@@ -668,12 +715,15 @@ def terminate_emby_session(session_id, chat_id):
     params = {'api_key': EMBY_API_KEY}
     response = make_request_with_retry('POST', url, params=params, timeout=10)
     if response:
+        print(f"✅ 会话 {session_id} 已成功终止。")
         return True
     else:
         if chat_id: send_simple_telegram_message(f"终止会话 {escape_markdown(session_id)} 失败。", chat_id)
+        print(f"❌ 终止会话 {session_id} 失败。")
         return False
 
 def send_message_to_emby_session(session_id, message, chat_id):
+    print(f"✉️ 正在向会话 {session_id} 发送消息。")
     if not all([EMBY_SERVER_URL, EMBY_API_KEY, session_id]):
         if chat_id: send_simple_telegram_message("错误：缺少发送消息所需的服务器配置。", chat_id)
         return
@@ -683,10 +733,13 @@ def send_message_to_emby_session(session_id, message, chat_id):
     response = make_request_with_retry('POST', url, params=params, json=payload, timeout=10)
     if response:
         if chat_id: send_simple_telegram_message("✅ 消息已成功发送。", chat_id)
+        print(f"✅ 消息已成功发送给会话 {session_id}。")
     else:
         if chat_id: send_simple_telegram_message(f"向会话 {escape_markdown(session_id)} 发送消息失败。", chat_id)
+        print(f"❌ 向会话 {session_id} 发送消息失败。")
 
 def get_resolution_for_item(item_id, user_id=None):
+    print(f"ℹ️ 正在获取项目 {item_id} 的分辨率。")
     request_user_id = user_id or EMBY_USER_ID
     if not request_user_id:
         url = f"{EMBY_SERVER_URL}/Items/{item_id}"
@@ -694,16 +747,24 @@ def get_resolution_for_item(item_id, user_id=None):
         url = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items/{item_id}"
     params = {'api_key': EMBY_API_KEY, 'Fields': 'MediaSources'}
     response = make_request_with_retry('GET', url, params=params, timeout=10)
-    if not response: return "未知分辨率"
+    if not response:
+        print(f"❌ 获取项目 {item_id} 的媒体源信息失败。")
+        return "未知分辨率"
     media_sources = response.json().get('MediaSources', [])
-    if not media_sources: return "未知分辨率"
+    if not media_sources:
+        print(f"❌ 项目 {item_id} 媒体源为空。")
+        return "未知分辨率"
     for stream in media_sources[0].get('MediaStreams', []):
         if stream.get('Type') == 'Video':
             width, height = stream.get('Width', 0), stream.get('Height', 0)
-            if width and height: return f"{width}x{height}"
+            if width and height:
+                print(f"✅ 获取到项目 {item_id} 的分辨率: {width}x{height}")
+                return f"{width}x{height}"
+    print(f"⚠️ 项目 {item_id} 中未找到视频流。")
     return "未知分辨率"
 
 def get_series_season_media_info(series_id):
+    print(f"ℹ️ 正在获取剧集 {series_id} 的季规格。")
     request_user_id = EMBY_USER_ID
     if not request_user_id: return ["错误：此功能需要配置 Emby User ID"]
     seasons_url = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items"
@@ -716,6 +777,7 @@ def get_series_season_media_info(series_id):
     for season in sorted(seasons, key=lambda s: s.get('IndexNumber', 0)):
         season_num, season_id = season.get('IndexNumber'), season.get('Id')
         if season_num is None or season_id is None: continue
+        print(f"ℹ️ 正在查询第 {season_num} 季 ({season_id}) 的剧集。")
         episodes_url = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items"
         episodes_params = {'api_key': EMBY_API_KEY, 'ParentId': season_id, 'IncludeItemTypes': 'Episode', 'Limit': 1, 'Fields': 'Id'}
         episodes_response = make_request_with_retry('GET', episodes_url, params=episodes_params, timeout=10)
@@ -732,6 +794,7 @@ def get_series_season_media_info(series_id):
     return season_info_lines if season_info_lines else ["未找到剧集规格信息"]
 
 def _get_latest_episode_info(series_id):
+    print(f"ℹ️ 正在获取剧集 {series_id} 的最新剧集信息。")
     request_user_id = EMBY_USER_ID
     if not all([EMBY_SERVER_URL, EMBY_API_KEY, series_id, request_user_id]): return {}
     api_endpoint = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items"
@@ -741,9 +804,13 @@ def _get_latest_episode_info(series_id):
         'Fields': 'ProviderIds,Path,ServerId,DateCreated,ParentIndexNumber,IndexNumber,SeriesName,SeriesProviderIds,Overview'
     }
     response = make_request_with_retry('GET', api_endpoint, params=params, timeout=15)
-    return response.json()['Items'][0] if response and response.json().get('Items') else {}
+    latest_episode = response.json()['Items'][0] if response and response.json().get('Items') else {}
+    if latest_episode:
+        print(f"✅ 获取到最新剧集: S{latest_episode.get('ParentIndexNumber')}E{latest_episode.get('IndexNumber')}")
+    return latest_episode
 
 def get_tmdb_season_details(series_tmdb_id, season_number):
+    print(f"ℹ️ 正在查询 TMDB 剧集 {series_tmdb_id} 第 {season_number} 季的详情。")
     if not all([TMDB_API_TOKEN, series_tmdb_id, season_number is not None]): return None
     proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
     url = f"https://api.themoviedb.org/3/tv/{series_tmdb_id}/season/{season_number}"
@@ -752,11 +819,15 @@ def get_tmdb_season_details(series_tmdb_id, season_number):
     if response:
         data = response.json()
         episodes = data.get('episodes', [])
-        if not episodes: return None
+        if not episodes:
+            print(f"❌ TMDB 未找到第 {season_number} 季的剧集列表。")
+            return None
+        print(f"✅ 成功获取第 {season_number} 季共 {len(episodes)} 集，最后一集类型: {episodes[-1].get('episode_type')}")
         return {'total_episodes': len(episodes), 'is_finale_marked': episodes[-1].get('episode_type') == 'finale'}
     return None
 
 def send_search_emby_and_format(query, chat_id, user_id, is_group_chat, mention):
+    print(f"🔍 用户 {user_id} 发起了 Emby 搜索，查询: {query}")
     search_term = query.strip()
     match = re.search(r'(\d{4})$', search_term)
     year_for_filter = match.group(1) if match else None
@@ -784,9 +855,11 @@ def send_search_emby_and_format(query, chat_id, user_id, is_group_chat, mention)
         return
     search_id = str(uuid.uuid4())
     SEARCH_RESULTS_CACHE[search_id] = results
+    print(f"✅ 搜索成功，找到 {len(results)} 个结果，缓存 ID: {search_id}")
     send_search_results_page(chat_id, search_id, user_id, page=1)
 
 def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=None):
+    print(f"📄 正在发送搜索结果第 {page} 页，缓存 ID: {search_id}")
     if search_id not in SEARCH_RESULTS_CACHE:
         error_msg = "抱歉，此搜索结果已过期，请重新发起搜索。"
         if message_id: edit_telegram_message(chat_id, message_id, error_msg)
@@ -816,6 +889,7 @@ def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=Non
     else: send_deletable_telegram_notification(message_text, chat_id=chat_id, inline_buttons=buttons, delay_seconds=90)
 
 def get_media_stream_details(item_id, user_id=None):
+    print(f"ℹ️ 正在获取项目 {item_id} 的媒体流信息。")
     request_user_id = user_id or EMBY_USER_ID
     if not all([EMBY_SERVER_URL, EMBY_API_KEY, request_user_id]): return None
 
@@ -827,6 +901,7 @@ def get_media_stream_details(item_id, user_id=None):
     item_data = response.json()
     media_sources = item_data.get('MediaSources', [])
     if not media_sources: return None
+    print(f"✅ 获取到项目 {item_id} 的媒体流信息。")
 
     video_info, audio_info_list = {}, []
     for stream in media_sources[0].get('MediaStreams', []):
@@ -852,25 +927,37 @@ def format_stream_details_message(stream_details, is_season_info=False, prefix='
 
     video_setting_path_map = {
         'movie': 'settings.content_settings.search_display.movie.show_video_spec',
-        'series': 'settings.content_settings.search_display.series.season_specs.show_video_spec'
+        'series': 'settings.content_settings.search_display.series.season_specs.show_video_spec',
+        'new_library_notification': 'settings.content_settings.new_library_notification.show_video_spec',
+        'playback_action': 'settings.content_settings.playback_action.show_video_spec'
     }
-    video_setting_path = video_setting_path_map[prefix] if not is_season_info else video_setting_path_map['series']
-
+    video_setting_path = video_setting_path_map.get(prefix)
+    
     video_info = stream_details.get('video_info')
     if video_info and get_setting(video_setting_path):
-        parts = [p for p in [video_info.get('title'), video_info.get('resolution') if video_info.get('resolution') != '0x0' else None, f"{video_info.get('bitrate')}Mbps" if video_info.get('bitrate') != '未知' else None, video_info.get('video_range')] if p]
+        parts = [video_info.get('title')]
+        if video_info.get('resolution') != '0x0':
+            parts.append(video_info.get('resolution'))
+        if video_info.get('bitrate') and video_info.get('bitrate') != '未知':
+            parts.append(f"{video_info.get('bitrate')}Mbps")
+        if video_info.get('video_range'):
+            parts.append(video_info.get('video_range'))
+
+        parts = [p for p in parts if p]
         if parts:
             video_line = ' '.join(parts)
-            label = "视频："
+            label = "视频规格：" if prefix == 'new_library_notification' or prefix == 'playback_action' else "视频："
             indent = "    " if is_season_info else ""
             message_parts.append(f"{indent}{label}{video_line}")
 
     audio_setting_path_map = {
         'movie': 'settings.content_settings.search_display.movie.show_audio_spec',
-        'series': 'settings.content_settings.search_display.series.season_specs.show_audio_spec'
+        'series': 'settings.content_settings.search_display.series.season_specs.show_audio_spec',
+        'new_library_notification': 'settings.content_settings.new_library_notification.show_audio_spec',
+        'playback_action': 'settings.content_settings.playback_action.show_audio_spec'
     }
-    audio_setting_path = audio_setting_path_map[prefix] if not is_season_info else audio_setting_path_map['series']
-
+    audio_setting_path = audio_setting_path_map.get(prefix)
+    
     audio_info_list = stream_details.get('audio_info')
     if audio_info_list and get_setting(audio_setting_path):
         audio_lines = []
@@ -887,13 +974,14 @@ def format_stream_details_message(stream_details, is_season_info=False, prefix='
         
         if audio_lines:
             full_audio_str = "、".join(audio_lines)
-            label = "音频："
+            label = "音频规格：" if prefix == 'new_library_notification' or prefix == 'playback_action' else "音频："
             indent = "    " if is_season_info else ""
             message_parts.append(f"{indent}{label}{full_audio_str}")
             
     return message_parts
 
 def send_search_detail(chat_id, search_id, item_index, user_id):
+    print(f"ℹ️ 正在发送搜索结果详情，缓存 ID: {search_id}, 索引: {item_index}")
     if search_id not in SEARCH_RESULTS_CACHE or item_index >= len(SEARCH_RESULTS_CACHE[search_id]):
         send_deletable_telegram_notification("抱歉，此搜索结果已过期或无效。", chat_id=chat_id)
         return
@@ -1000,6 +1088,7 @@ def send_search_detail(chat_id, search_id, item_index, user_id):
     )
 
 def send_settings_menu(chat_id, user_id, message_id=None, menu_key='root'):
+    print(f"⚙️ 正在向用户 {user_id} 发送设置菜单，菜单键: {menu_key}")
     node = SETTINGS_MENU_STRUCTURE.get(menu_key, SETTINGS_MENU_STRUCTURE['root'])
     text_parts = [f"*{escape_markdown(node['label'])}*"]
     if menu_key == 'root':
@@ -1030,6 +1119,7 @@ def send_settings_menu(chat_id, user_id, message_id=None, menu_key='root'):
 
 def handle_callback_query(callback_query):
     query_id, data = callback_query['id'], callback_query.get('data')
+    print(f"📞 收到回调查询。ID: {query_id}, 数据: {data}")
     if not data:
         answer_callback_query(query_id)
         return
@@ -1040,17 +1130,19 @@ def handle_callback_query(callback_query):
         main_data, initiator_id_str = rest_of_data.rsplit('_', 1)
         initiator_id = int(initiator_id_str)
     except (ValueError, IndexError) as e:
-        print(f"ERROR: Could not parse callback data: {data}. Error: {e}")
+        print(f"❌ 错误：无法解析回调数据: {data}。错误: {e}")
         answer_callback_query(query_id, text="发生了一个内部错误。", show_alert=True)
         return
 
     if clicker_id != initiator_id:
         answer_callback_query(query_id, text="交互由其他用户发起，您无法操作！", show_alert=True)
+        print(f"⚠️ 拒绝非发起者 ({clicker_id}) 的回调操作。")
         return
 
     is_super_admin_action = command in ['n', 't', 'c', 'session']
     if is_super_admin_action and not is_super_admin(clicker_id):
         answer_callback_query(query_id, text="抱歉，此操作仅对超级管理员开放。", show_alert=True)
+        print(f"🚫 拒绝非管理员 ({clicker_id}) 的管理员回调操作。")
         return
         
     if command == 'n':
@@ -1062,7 +1154,7 @@ def handle_callback_query(callback_query):
         item_index = int(main_data)
         node_key = TOGGLE_INDEX_TO_KEY.get(item_index)
         if not node_key:
-            print(f"ERROR: Invalid toggle index received: {item_index}")
+            print(f"❌ 错误: 收到无效的开关索引: {item_index}")
             return
         node_info = TOGGLE_KEY_TO_INFO.get(node_key)
         config_path = node_info['config_path']
@@ -1072,6 +1164,7 @@ def handle_callback_query(callback_query):
         save_config()
         answer_callback_query(query_id, text=f"设置已更新: {'✅' if not current_value else '❌'}")
         send_settings_menu(chat_id, initiator_id, message_id, menu_key_to_refresh)
+        print(f"✅ 管理员 {initiator_id} 切换了设置 {config_path} 为 {not current_value}")
         return
     if command == 'c' and main_data == 'menu':
         answer_callback_query(query_id)
@@ -1109,6 +1202,7 @@ def handle_callback_query(callback_query):
         
 def handle_telegram_command(message):
     msg_text, chat_id, user_id = message.get('text', '').strip(), message['chat']['id'], message['from']['id']
+    print(f"➡️ 收到来自用户 {user_id} 在 Chat ID {chat_id} 的命令: {msg_text}")
 
     if not is_user_authorized(user_id):
         print(f"🚫 已忽略来自非授权用户 {user_id} 的消息。")
@@ -1124,6 +1218,7 @@ def handle_telegram_command(message):
         if is_bot_command:
             user_search_state.pop(chat_id, None)
             user_context.pop(chat_id, None)
+            print(f"ℹ️ 用户 {user_id} 输入了新命令，取消之前的等待状态。")
         else:
             if not is_group_chat or is_reply:
                 if chat_id in user_search_state:
@@ -1131,11 +1226,13 @@ def handle_telegram_command(message):
                     if original_user_id is None or original_user_id != user_id:
                         return
                     del user_search_state[chat_id]
+                    print(f"🔍 用户 {user_id} 发起了搜索: {msg_text}")
                     send_search_emby_and_format(msg_text, chat_id, user_id, is_group_chat, mention)
                     return
                 elif chat_id in user_context and user_context[chat_id].get('state') == 'awaiting_message_for_session':
                     session_id_to_send = user_context[chat_id]['session_id']
                     del user_context[chat_id]
+                    print(f"✉️ 用户 {user_id} 回复了消息，发送给会话 {session_id_to_send}: {msg_text}")
                     send_message_to_emby_session(session_id_to_send, msg_text, chat_id)
                     return
 
@@ -1146,9 +1243,11 @@ def handle_telegram_command(message):
     if command in ['/status', '/settings']:
         if not is_super_admin(user_id):
             send_simple_telegram_message("权限不足：此命令仅限超级管理员使用。", chat_id)
+            print(f"🚫 拒绝用户 {user_id} 执行管理员命令 {command}")
             return
         
         if command == '/status':
+            print("📊 正在处理 /status 命令...")
             status_info = get_active_sessions_info(user_id)
             if isinstance(status_info, str):
                 send_deletable_telegram_notification(f"{mention}{status_info}", chat_id=chat_id)
@@ -1170,14 +1269,17 @@ def handle_telegram_command(message):
                         send_deletable_telegram_notification(text=session_data['message'], chat_id=chat_id, inline_buttons=session_data.get('buttons'), disable_preview=True)
                     time.sleep(0.5)
         elif command == '/settings':
+            print("⚙️ 正在处理 /settings 命令...")
             send_settings_menu(chat_id, user_id)
         return
 
     if command == '/search':
         search_term = msg_text[len('/search'):].strip()
         if search_term:
+            print(f"🔍 正在处理带参数的 /search 命令: {search_term}")
             send_search_emby_and_format(search_term, chat_id, user_id, is_group_chat, mention)
         else:
+            print(f"🔍 正在处理不带参数的 /search 命令，进入等待状态。")
             user_search_state[chat_id] = user_id
             prompt_message = "请提供您想搜索的节目名称（可选年份）。\n例如：流浪地球 或 凡人修仙传 2025"
             if is_group_chat:
@@ -1201,8 +1303,8 @@ def poll_telegram_updates():
                         message = update['message']
                         chat_id = message['chat']['id']
                         message_id = message['message_id']
-                        is_group_chat = chat_id < 0
                         
+                        is_group_chat = chat_id < 0
                         should_delete = False
                         if not is_group_chat:
                             should_delete = True
@@ -1229,310 +1331,354 @@ def poll_telegram_updates():
             print(f"轮询 Telegram 时网络错误: {e}")
             time.sleep(10)
         except Exception as e:
-            import traceback
             print(f"处理 Telegram 更新时发生未处理错误: {e}")
             traceback.print_exc()
             time.sleep(5)
 
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
+        print("🔔 接收到 Webhook 请求。")
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             post_data_bytes = self.rfile.read(content_length)
-            
+
             content_type = self.headers.get('Content-Type', '').lower()
+            json_string = None
+
             if 'application/json' in content_type:
                 json_string = post_data_bytes.decode('utf-8')
             elif 'application/x-www-form-urlencoded' in content_type:
                 parsed_form = parse_qs(post_data_bytes.decode('utf-8'))
                 json_string = parsed_form.get('data', [None])[0]
             else:
-                self.send_response(400); self.end_headers(); return
+                print(f"❌ 不支持的 Content-Type: {content_type}")
+                self.send_response(400)
+                self.end_headers()
+                return
 
-            if not json_string: 
-                self.send_response(400); self.end_headers(); return
-            
+            if not json_string:
+                print("❌ Webhook 请求中没有数据。")
+                self.send_response(400)
+                self.end_headers()
+                return
+
             event_data = json.loads(unquote(json_string))
+            print("\n--- Emby Webhook 推送内容开始 ---\n")
+            print(json.dumps(event_data, indent=2, ensure_ascii=False))
+            print("\n--- Emby Webhook 推送内容结束 ---\n")
+
             event_type = event_data.get('Event')
             item_from_webhook = event_data.get('Item', {})
-
-            if event_type == 'library.deleted':
-                item_type = item_from_webhook.get('Type')
-                if item_type not in ['Movie', 'Series', 'Episode']:
-                    self.send_response(204); self.end_headers()
-                    return
-            
-            event_map = {
-                'playback.start': 'settings.notification_management.playback_start', 
-                'playback.unpause': 'settings.notification_management.playback_start',
-                'playback.pause': 'settings.notification_management.playback_pause', 
-                'playback.stop': 'settings.notification_management.playback_stop',
-                'library.new': 'library.new',
-                'library.deleted': 'settings.notification_management.library_deleted'
-            }
-            setting_key = event_map.get(event_type)
-
-            if setting_key == 'library.new':
-                if not any([get_setting('settings.notification_management.library_new.to_group'), get_setting('settings.notification_management.library_new.to_channel'), get_setting('settings.notification_management.library_new.to_private')]):
-                    self.send_response(204); self.end_headers(); return
-            elif setting_key and not get_setting(setting_key):
-                self.send_response(204); self.end_headers(); return
-
-            user, session = event_data.get('User', {}), event_data.get('Session', {})
+            user = event_data.get('User', {})
+            session = event_data.get('Session', {})
             playback_info = event_data.get('PlaybackInfo', {})
+            print(f"ℹ️ 检测到 Emby 事件: {event_type}")
 
-            if event_type in ["playback.start", "playback.unpause", "playback.stop", "playback.pause", "library.new", "library.deleted"]:
-                if event_type in ["playback.start", "playback.unpause"]:
-                    now = time.time()
-                    event_key = (user.get('Id'), item_from_webhook.get('Id'))
-                    if now - recent_playback_notifications.get(event_key, 0) < PLAYBACK_DEBOUNCE_SECONDS:
-                        self.send_response(204); self.end_headers(); return
-                    recent_playback_notifications[event_key] = now
+            if event_type == "library.new":
+                if not any([get_setting('settings.notification_management.library_new.to_group'), get_setting('settings.notification_management.library_new.to_channel'), get_setting('settings.notification_management.library_new.to_private')]):
+                    print("⚠️ 已关闭新增节目通知，跳过。")
+                    self.send_response(204)
+                    self.end_headers()
+                    return
                 
                 item = item_from_webhook
-                if event_type not in ["library.deleted"]:
-                    item_id = item_from_webhook.get('Id')
-                    if item_id and EMBY_USER_ID:
-                        full_item_url = f"{EMBY_SERVER_URL}/Users/{EMBY_USER_ID}/Items/{item_id}"
-                        params = {'api_key': EMBY_API_KEY, 'Fields': 'ProviderIds,Path,Overview,ProductionYear,ServerId,DateCreated,SeriesProviderIds'}
-                        response = make_request_with_retry('GET', full_item_url, params=params, timeout=10)
-                        if response:
-                            item = response.json()
+                stream_details = None
                 
+                if item.get('Id') and EMBY_USER_ID:
+                    print(f"ℹ️ 正在使用 Emby API 补充项目 {item.get('Id')} 的元数据。")
+                    full_item_url = f"{EMBY_SERVER_URL}/Users/{EMBY_USER_ID}/Items/{item.get('Id')}"
+                    params = {'api_key': EMBY_API_KEY, 'Fields': 'ProviderIds,Path,Overview,ProductionYear,ServerId,DateCreated,SeriesProviderIds'}
+                    response = make_request_with_retry('GET', full_item_url, params=params, timeout=10)
+                    if response:
+                        item = response.json()
+                        print("✅ 补充元数据成功。")
+                    else:
+                        print("❌ 补充元数据失败，将使用 Webhook 原始数据。")
                 media_details = get_media_details(item, user.get('Id'))
                 
-                raw_title = item.get('SeriesName') if item.get('Type') == 'Episode' else item.get('Name', '未知标题')
-                raw_episode_info = ""
+                if item.get('Type') == 'Series':
+                    latest_episode = _get_latest_episode_info(item.get('Id'))
+                    if latest_episode:
+                        stream_details = get_media_stream_details(latest_episode.get('Id'), EMBY_USER_ID)
+                else:
+                    stream_details = get_media_stream_details(item.get('Id'), None)
+                    
+                parts = []
                 
-                # --- 新增逻辑: 检查是否为 Type:Series 的多集更新 ---
+                raw_episode_info = ""
                 if item.get('Type') == 'Series':
                     description = event_data.get('Description', '')
-                    # 使用正则表达式从 Description 中提取 "S01 E01-E05" 这样的信息
                     match = re.search(r'(S\d+ E\d+[-]?E?\d*)', description)
                     if match:
                         raw_episode_info = f" {match.group(1)}"
                 elif item.get('Type') == 'Episode':
                     s, e, en = item.get('ParentIndexNumber'), item.get('IndexNumber'), item.get('Name')
                     raw_episode_info = f" S{s:02d}E{e:02d} {en or ''}" if s is not None and e is not None else f" {en or ''}"
+
+                if item.get('Type') in ['Episode', 'Series', 'Season']:
+                    raw_title = item.get('SeriesName', item.get('Name', '未知标题'))
+                else:
+                    raw_title = item.get('Name', '未知标题')
                 
                 title_with_year_and_episode = f"{raw_title} ({media_details.get('year')})" if media_details.get('year') else raw_title
                 title_with_year_and_episode += raw_episode_info
+
+                action_text = "✅ 新增"
+                item_type_cn = "剧集" if item.get('Type') in ['Episode', 'Series', 'Season'] else "电影" if item.get('Type') == 'Movie' else ""
+
+                if get_setting('settings.content_settings.new_library_notification.show_media_detail'):
+                    if get_setting('settings.content_settings.new_library_notification.media_detail_has_tmdb_link') and media_details.get('tmdb_link'):
+                        full_title_line = f"[{escape_markdown(title_with_year_and_episode)}]({media_details.get('tmdb_link')})"
+                    else:
+                        full_title_line = escape_markdown(title_with_year_and_episode)
+                    parts.append(f"{action_text}{item_type_cn} {full_title_line}")
+                else:
+                    parts.append(f"{action_text}{item_type_cn}")
+
+                if get_setting('settings.content_settings.new_library_notification.show_media_type'):
+                    raw_program_type = get_program_type_from_path(item.get('Path'))
+                    if raw_program_type:
+                        parts.append(f"节目类型：{escape_markdown(raw_program_type)}")
+
+                if get_setting('settings.content_settings.new_library_notification.show_overview'):
+                    overview_text = item.get('Overview', '暂无剧情简介')
+                    if overview_text:
+                        overview_text = overview_text[:150] + "..." if len(overview_text) > 150 else overview_text
+                        parts.append(f"剧情：{escape_markdown(overview_text)}")
+                    
+                if stream_details:
+                    formatted_specs = format_stream_details_message(stream_details, prefix='new_library_notification')
+                    for part in formatted_specs:
+                        parts.append(escape_markdown(part))
+
+                if get_setting('settings.content_settings.new_library_notification.show_timestamp'):
+                    parts.append(f"入库时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
+
+                message = "\n".join(parts)
                 
-                action_text_map = {"playback.start": "▶️ 开始播放", "playback.unpause": "▶️ 继续播放", "playback.stop": "⏹️ 停止播放", "playback.pause": "⏸️ 暂停播放", "library.new": "✅ 新增", "library.deleted": "❌ 删除"}
+                photo_url = None
+                if get_setting('settings.content_settings.new_library_notification.show_poster'): photo_url = media_details.get('poster_url')
+                
+                buttons = []
+                if get_setting('settings.content_settings.new_library_notification.show_view_on_server_button') and EMBY_REMOTE_URL:
+                    item_id, server_id = item.get('Id'), item.get('ServerId')
+                    if item_id and server_id:
+                        item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
+                        buttons.append([{'text': '▶️ 在服务器中查看', 'url': item_url}])
+
+                auto_delete_group = get_setting('settings.auto_delete_settings.new_library.to_group')
+                auto_delete_channel = get_setting('settings.auto_delete_settings.new_library.to_channel')
+                auto_delete_private = get_setting('settings.auto_delete_settings.new_library.to_private')
+                
+                if get_setting('settings.notification_management.library_new.to_group') and GROUP_ID:
+                    print(f"✉️ 向群组 {GROUP_ID} 发送新增通知。")
+                    if auto_delete_group: send_deletable_telegram_notification(message, photo_url, chat_id=GROUP_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
+                    else: send_telegram_notification(message, photo_url, chat_id=GROUP_ID, inline_buttons=buttons if buttons else None)
+
+                if get_setting('settings.notification_management.library_new.to_channel') and CHANNEL_ID:
+                    print(f"✉️ 向频道 {CHANNEL_ID} 发送新增通知。")
+                    if auto_delete_channel: send_deletable_telegram_notification(message, photo_url, chat_id=CHANNEL_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
+                    else: send_telegram_notification(message, photo_url, chat_id=CHANNEL_ID, inline_buttons=buttons if buttons else None)
+
+                if get_setting('settings.notification_management.library_new.to_private') and ADMIN_USER_ID:
+                    print(f"✉️ 向管理员 {ADMIN_USER_ID} 发送新增通知。")
+                    if auto_delete_private: send_deletable_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
+                    else: send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None)
+
+            elif event_type == "library.deleted":
+                if not get_setting('settings.notification_management.library_deleted'):
+                    print("⚠️ 已关闭删除节目通知，跳过。")
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+                
+                item_type = item_from_webhook.get('Type')
+                if item_type not in ['Movie', 'Series', 'Season', 'Episode']:
+                    print(f"⚠️ 忽略不支持的删除事件类型: {item_type}")
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+
+                item = item_from_webhook
+                media_details = None
+                print(f"ℹ️ 正在处理删除事件，项目类型: {item_type}")
+
+                if item_from_webhook.get('Type') in ['Episode', 'Season'] and item_from_webhook.get('SeriesId'):
+                    series_id = item_from_webhook.get('SeriesId')
+                    series_item = {}
+                    if EMBY_USER_ID:
+                        print(f"ℹ️ 正在查询被删除剧集或季度的父剧集 {series_id} 的元数据。")
+                        series_url = f"{EMBY_SERVER_URL}/Users/{EMBY_USER_ID}/Items/{series_id}"
+                        params = {'api_key': EMBY_API_KEY, 'Fields': 'ProviderIds'}
+                        response = make_request_with_retry('GET', series_url, params=params, timeout=10)
+                        if response:
+                            series_item = response.json()
+                    media_details = get_media_details(series_item, user.get('Id'))
+                    item['SeriesName'] = item_from_webhook.get('SeriesName')
+                    item['Overview'] = item_from_webhook.get('Overview')
+                    item['ProductionYear'] = item_from_webhook.get('ProductionYear')
+                else:
+                    media_details = get_media_details(item_from_webhook, user.get('Id'))
+
+                parts = []
+                series_name = item.get('SeriesName') or item.get('Name', '未知标题')
+                title_with_year_and_episode = f"{series_name} ({media_details.get('year')})" if media_details.get('year') else series_name
+                if item.get('Type') in ['Episode', 'Season']:
+                    s_num = item.get('ParentIndexNumber') if item.get('Type') == 'Episode' else item.get('IndexNumber')
+                    if s_num is not None:
+                        title_with_year_and_episode += f" S{s_num:02d}"
+                if item.get('Type') == 'Episode':
+                    e_num = item.get('IndexNumber')
+                    if e_num is not None:
+                        title_with_year_and_episode += f"E{e_num:02d}"
+
+                action_text = "❌ 删除"
+                item_type_cn = "剧集" if item.get('Type') in ['Episode', 'Series', 'Season'] else "电影" if item.get('Type') == 'Movie' else ""
+
+                if get_setting('settings.content_settings.library_deleted_notification.show_media_detail'):
+                    if get_setting('settings.content_settings.library_deleted_notification.media_detail_has_tmdb_link') and media_details.get('tmdb_link'):
+                        full_title_line = f"[{escape_markdown(title_with_year_and_episode)}]({media_details.get('tmdb_link')})"
+                    else:
+                        full_title_line = escape_markdown(title_with_year_and_episode)
+                    parts.append(f"{action_text} {item_type_cn} {full_title_line}")
+                else:
+                    parts.append(f"{action_text} {item_type_cn}")
+
+                raw_program_type = get_program_type_from_path(item.get('Path'))
+                if raw_program_type and get_setting('settings.content_settings.library_deleted_notification.show_media_type'):
+                    parts.append(f"节目类型：{escape_markdown(raw_program_type)}")
+
+                webhook_overview = item.get('Overview')
+                if webhook_overview and get_setting('settings.content_settings.library_deleted_notification.show_overview'):
+                    overview = webhook_overview[:150] + '...' if len(webhook_overview) > 150 else webhook_overview
+                    parts.append(f"剧情：{escape_markdown(overview)}")
+                
+                if get_setting('settings.content_settings.library_deleted_notification.show_timestamp'):
+                    parts.append(f"删除时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
+                
+                message = "\n".join(parts)
+                photo_url = None
+                if get_setting('settings.content_settings.library_deleted_notification.show_poster'):
+                    photo_url = media_details.get('poster_url')
+                auto_delete = get_setting('settings.auto_delete_settings.library_deleted')
+                print(f"✉️ 向管理员 {ADMIN_USER_ID} 发送删除通知。")
+                if auto_delete:
+                    send_deletable_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, delay_seconds=60)
+                else:
+                    send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID)
+
+            elif event_type in ["playback.start", "playback.unpause", "playback.stop", "playback.pause"]:
+                event_key_map = {
+                    'playback.start': 'playback_start',
+                    'playback.unpause': 'playback_start',
+                    'playback.stop': 'playback_stop',
+                    'playback.pause': 'playback_pause'
+                }
+                notification_type = event_key_map.get(event_type)
+                if not notification_type or not get_setting(f'settings.notification_management.{notification_type}'):
+                    print(f"⚠️ 已关闭 {event_type} 通知，跳过。")
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+                
+                if event_type in ["playback.start", "playback.unpause"]:
+                    now = time.time()
+                    event_key = (user.get('Id'), item_from_webhook.get('Id'))
+                    if now - recent_playback_notifications.get(event_key, 0) < PLAYBACK_DEBOUNCE_SECONDS:
+                        print(f"⏳ 忽略 {event_type} 事件，因为它发生在防抖时间 ({PLAYBACK_DEBOUNCE_SECONDS}秒) 内。")
+                        self.send_response(204)
+                        self.end_headers()
+                        return
+                    recent_playback_notifications[event_key] = now
+                
+                item = item_from_webhook
+                media_details = get_media_details(item, user.get('Id'))
+                stream_details = get_media_stream_details(item.get('Id'), user.get('Id'))
+                
+                raw_title = item.get('SeriesName') if item.get('Type') == 'Episode' else item.get('Name', '未知标题')
+                raw_episode_info = ""
+                if item.get('Type') == 'Episode':
+                    s, e, en = item.get('ParentIndexNumber'), item.get('IndexNumber'), item.get('Name')
+                    raw_episode_info = f" S{s:02d}E{e:02d} {en or ''}" if s is not None and e is not None else f" {en or ''}"
+                
+                title_with_year_and_episode = f"{raw_title} ({media_details.get('year')})" if media_details.get('year') else raw_title
+                title_with_year_and_episode += raw_episode_info
+
+                action_text_map = {"playback.start": "▶️ 开始播放", "playback.unpause": "▶️ 继续播放", "playback.stop": "⏹️ 停止播放", "playback.pause": "⏸️ 暂停播放"}
                 action_text = action_text_map.get(event_type, "")
                 item_type_cn = "剧集" if item.get('Type') in ['Episode', 'Series'] else "电影" if item.get('Type') == 'Movie' else ""
-
-                message = ""
-                photo_url = None
-                buttons = []
                 
-                if event_type == "library.new":
-                    parts = []
-                    # 对于多集更新，item_type是Series，但我们需要显示剧集类型为“剧集”
-                    current_item_type = item.get('Type')
-                    if current_item_type == 'Series' or current_item_type == 'Episode':
-                        item_type_cn = '剧集'
-                    elif current_item_type == 'Movie':
-                        item_type_cn = '电影'
+                parts = []
+                if get_setting('settings.content_settings.playback_action.show_media_detail'):
+                    if get_setting('settings.content_settings.playback_action.media_detail_has_tmdb_link') and media_details.get('tmdb_link'):
+                        full_title_line = f"[{escape_markdown(title_with_year_and_episode)}]({media_details.get('tmdb_link')})"
                     else:
-                        item_type_cn = ''
-
-                    if get_setting('settings.content_settings.new_library_notification.show_media_detail'):
-                        if get_setting('settings.content_settings.new_library_notification.media_detail_has_tmdb_link') and media_details.get('tmdb_link'):
-                            full_title_line = f"[{escape_markdown(title_with_year_and_episode)}]({media_details.get('tmdb_link')})"
-                        else:
-                            full_title_line = escape_markdown(title_with_year_and_episode)
-                        parts.append(f"{action_text}{item_type_cn} {full_title_line}")
-                    else:
-                        parts.append(f"{action_text}{item_type_cn}")
-
-                    if get_setting('settings.content_settings.new_library_notification.show_media_type'):
-                        raw_program_type = get_program_type_from_path(item.get('Path'))
-                        if raw_program_type:
-                            parts.append(f"节目类型：{escape_markdown(raw_program_type)}")
-
-                    if get_setting('settings.content_settings.new_library_notification.show_overview'):
-                        overview_text = item.get('Overview', '暂无剧情简介')
-                        if overview_text:
-                            overview_text = overview_text[:150] + "..." if len(overview_text) > 150 else overview_text
-                            parts.append(f"剧情：{escape_markdown(overview_text)}")
-
-                    stream_details = get_media_stream_details(item.get('Id'), None)
-                    if stream_details:
-                        if get_setting('settings.content_settings.new_library_notification.show_video_spec'):
-                            video_info = stream_details.get('video_info', {})
-                            if video_info and video_info.get('resolution') != '0x0':
-                                parts.append(f"视频规格：{escape_markdown(' '.join([v for k, v in video_info.items() if v]))}")
-
-                        if get_setting('settings.content_settings.new_library_notification.show_audio_spec'):
-                            audio_info_list = stream_details.get('audio_info', [])
-                            if audio_info_list:
-                                audio_lines = []
-                                seen_tracks = set()
-                                for a_info in audio_info_list:
-                                    lang_code = a_info.get('language', 'und').lower()
-                                    lang_display = LANG_MAP.get(lang_code, {}).get('zh', lang_code.capitalize())
-                                    audio_parts = [p for p in [lang_display, a_info.get('codec', '').upper(), a_info.get('layout', '')] if p and p != '未知']
-                                    track_str = ' '.join(audio_parts)
-                                    if track_str and track_str not in seen_tracks:
-                                        audio_lines.append(track_str)
-                                        seen_tracks.add(track_str)
-                                if audio_lines: parts.append(f"音频规格：{escape_markdown('、'.join(audio_lines))}")
-
-                    if get_setting('settings.content_settings.new_library_notification.show_timestamp'):
-                        parts.append(f"入库时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
-
-                    message = "\n".join(parts)
-                    
-                    if get_setting('settings.content_settings.new_library_notification.show_poster'): photo_url = media_details.get('poster_url')
-                    
-                    view_button = None
-                    if get_setting('settings.content_settings.new_library_notification.show_view_on_server_button') and EMBY_REMOTE_URL:
-                        item_id, server_id = item.get('Id'), item.get('ServerId')
-                        if item_id and server_id:
-                            item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
-                            view_button = {'text': '▶️ 在服务器中查看', 'url': item_url}
-                            buttons.append([view_button])
-
-                    auto_delete_group = get_setting('settings.auto_delete_settings.new_library.to_group')
-                    auto_delete_channel = get_setting('settings.auto_delete_settings.new_library.to_channel')
-                    auto_delete_private = get_setting('settings.auto_delete_settings.new_library.to_private')
-                    
-                    if get_setting('settings.notification_management.library_new.to_group') and GROUP_ID:
-                        if auto_delete_group: send_deletable_telegram_notification(message, photo_url, chat_id=GROUP_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
-                        else: send_telegram_notification(message, photo_url, chat_id=GROUP_ID, inline_buttons=buttons if buttons else None)
-
-                    if get_setting('settings.notification_management.library_new.to_channel') and CHANNEL_ID:
-                        if auto_delete_channel: send_deletable_telegram_notification(message, photo_url, chat_id=CHANNEL_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
-                        else: send_telegram_notification(message, photo_url, chat_id=CHANNEL_ID, inline_buttons=buttons if buttons else None)
-
-                    if get_setting('settings.notification_management.library_new.to_private') and ADMIN_USER_ID:
-                        if auto_delete_private: send_deletable_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
-                        else: send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None)
-
-
-                elif event_type == "library.deleted":
-                    parts = []
-                    if get_setting('settings.content_settings.library_deleted_notification.show_media_detail'):
-                        if get_setting('settings.content_settings.library_deleted_notification.media_detail_has_tmdb_link') and media_details.get('tmdb_link'):
-                            full_title_line = f"[{escape_markdown(title_with_year_and_episode)}]({media_details.get('tmdb_link')})"
-                        else:
-                            full_title_line = escape_markdown(title_with_year_and_episode)
-                        parts.append(f"❌ 删除 {item_type_cn} {full_title_line}")
-                    else:
-                        parts.append(f"❌ 删除 {item_type_cn}")
-
-                    raw_program_type = get_program_type_from_path(item.get('Path'))
-                    if raw_program_type and get_setting('settings.content_settings.library_deleted_notification.show_media_type'):
-                        parts.append(f"节目类型：{escape_markdown(raw_program_type)}")
-
-                    webhook_overview = item.get('Overview')
-                    if webhook_overview and get_setting('settings.content_settings.library_deleted_notification.show_overview'):
-                        overview = webhook_overview[:150] + '...' if len(webhook_overview) > 150 else webhook_overview
-                        parts.append(f"剧情：{escape_markdown(overview)}")
-                    
-                    if get_setting('settings.content_settings.library_deleted_notification.show_timestamp'):
-                        parts.append(f"删除时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
-                    
-                    message = "\n".join(parts)
-                    if get_setting('settings.content_settings.library_deleted_notification.show_poster'):
-                        photo_url = media_details.get('poster_url')
-                    auto_delete = get_setting('settings.auto_delete_settings.library_deleted')
-                    if auto_delete:
-                        send_deletable_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, delay_seconds=60)
-                    else:
-                        send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID)
-                
+                        full_title_line = escape_markdown(title_with_year_and_episode)
+                    parts.append(f"{action_text}{item_type_cn} {full_title_line}")
                 else:
-                    parts = []
-                    if get_setting('settings.content_settings.playback_action.show_media_detail'):
-                        if get_setting('settings.content_settings.playback_action.media_detail_has_tmdb_link') and media_details.get('tmdb_link'):
-                            full_title_line = f"[{escape_markdown(title_with_year_and_episode)}]({media_details.get('tmdb_link')})"
-                        else:
-                            full_title_line = escape_markdown(title_with_year_and_episode)
-                        parts.append(f"{action_text}{item_type_cn} {full_title_line}")
-                    else:
-                        parts.append(f"{action_text}{item_type_cn}")
-                    
-                    if get_setting('settings.content_settings.playback_action.show_user'): parts.append(f"用户：{escape_markdown(user.get('Name', '未知用户'))}")
-                    if get_setting('settings.content_settings.playback_action.show_player'): parts.append(f"播放器：{escape_markdown(session.get('Client', ''))}")
-                    if get_setting('settings.content_settings.playback_action.show_device'): parts.append(f"设备：{escape_markdown(session.get('DeviceName', ''))}")
-                    if get_setting('settings.content_settings.playback_action.show_location'):
-                        ip = session.get('RemoteEndPoint', '').split(':')[0]
-                        loc = get_ip_geolocation(ip)
-                        parts.append(f"位置：{escape_markdown('局域网' if loc == '局域网' else f'{ip} {loc}')}")
-                    if get_setting('settings.content_settings.playback_action.show_progress'):
-                        pos_ticks, run_ticks = playback_info.get('PositionTicks'), item.get('RunTimeTicks')
-                        if pos_ticks is not None and run_ticks and run_ticks > 0:
-                            percent = (pos_ticks / run_ticks) * 100
-                            progress = f"进度：已观看 {percent:.1f}%" if event_type == "playback.stop" else f"进度：{percent:.1f}% ({format_ticks_to_hms(pos_ticks)} / {format_ticks_to_hms(run_ticks)})"
-                            parts.append(escape_markdown(progress))
-                    
-                    stream_details = get_media_stream_details(item.get('Id'), user.get('Id'))
-                    if stream_details:
-                        if get_setting('settings.content_settings.playback_action.show_video_spec'):
-                            video_info = stream_details.get('video_info', {})
-                            if video_info:
-                                video_line_parts = [p for p in [video_info.get('title'), video_info.get('resolution') if video_info.get('resolution') != '0x0' else None, f"{video_info.get('bitrate')}Mbps" if video_info.get('bitrate') != '未知' else None, video_info.get('video_range')] if p]
-                                if video_line_parts: parts.append(f"视频规格: {escape_markdown(' '.join(video_line_parts))}")
-                        if get_setting('settings.content_settings.playback_action.show_audio_spec'):
-                            audio_info_list = stream_details.get('audio_info', [])
-                            if audio_info_list:
-                                audio_lines = []
-                                seen_tracks = set()
-                                for a_info in audio_info_list:
-                                    lang_code = a_info.get('language', 'und').lower()
-                                    lang_display = LANG_MAP.get(lang_code, {}).get('zh', lang_code.capitalize())
-                                    audio_parts = [p for p in [lang_display if lang_display != '未知' else None, a_info.get('codec', '').upper() if a_info.get('codec', '') != '未知' else None, a_info.get('layout', '')] if p]
-                                    if audio_parts:
-                                        track_str = ' '.join(audio_parts)
-                                        if track_str not in seen_tracks:
-                                            audio_lines.append(track_str)
-                                            seen_tracks.add(track_str)
-                                if audio_lines: parts.append(f"音频规格: {escape_markdown('、'.join(audio_lines))}")
-                    
-                    raw_program_type = get_program_type_from_path(item.get('Path'))
-                    if raw_program_type and get_setting('settings.content_settings.playback_action.show_media_type'):
-                        parts.append(f"节目类型：{escape_markdown(raw_program_type)}")
+                    parts.append(f"{action_text}{item_type_cn}")
+                
+                if get_setting('settings.content_settings.playback_action.show_user'): parts.append(f"用户：{escape_markdown(user.get('Name', '未知用户'))}")
+                if get_setting('settings.content_settings.playback_action.show_player'): parts.append(f"播放器：{escape_markdown(session.get('Client', ''))}")
+                if get_setting('settings.content_settings.playback_action.show_device'): parts.append(f"设备：{escape_markdown(session.get('DeviceName', ''))}")
+                if get_setting('settings.content_settings.playback_action.show_location'):
+                    ip = session.get('RemoteEndPoint', '').split(':')[0]
+                    loc = get_ip_geolocation(ip)
+                    parts.append(f"位置：{escape_markdown('局域网' if loc == '局域网' else f'{ip} {loc}')}")
+                if get_setting('settings.content_settings.playback_action.show_progress'):
+                    pos_ticks, run_ticks = playback_info.get('PositionTicks'), item.get('RunTimeTicks')
+                    if pos_ticks is not None and run_ticks and run_ticks > 0:
+                        percent = (pos_ticks / run_ticks) * 100
+                        progress = f"进度：已观看 {percent:.1f}%" if event_type == "playback.stop" else f"进度：{percent:.1f}% ({format_ticks_to_hms(pos_ticks)} / {format_ticks_to_hms(run_ticks)})"
+                        parts.append(escape_markdown(progress))
+                
+                if stream_details:
+                    formatted_specs = format_stream_details_message(stream_details, prefix='playback_action')
+                    for part in formatted_specs:
+                        parts.append(escape_markdown(part))
+                
+                raw_program_type = get_program_type_from_path(item.get('Path'))
+                if raw_program_type and get_setting('settings.content_settings.playback_action.show_media_type'):
+                    parts.append(f"节目类型：{escape_markdown(raw_program_type)}")
 
-                    webhook_overview = item.get('Overview')
-                    if webhook_overview and get_setting('settings.content_settings.playback_action.show_overview'):
-                        overview = webhook_overview[:150] + '...' if len(webhook_overview) > 150 else webhook_overview
-                        parts.append(f"剧情：{escape_markdown(overview)}")
-                    
-                    if get_setting('settings.content_settings.playback_action.show_timestamp'):
-                        parts.append(f"时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
+                webhook_overview = item.get('Overview')
+                if webhook_overview and get_setting('settings.content_settings.playback_action.show_overview'):
+                    overview = webhook_overview[:150] + '...' if len(webhook_overview) > 150 else webhook_overview
+                    parts.append(f"剧情：{escape_markdown(overview)}")
+                
+                if get_setting('settings.content_settings.playback_action.show_timestamp'):
+                    parts.append(f"时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
 
-                    message = "\n".join(parts)
-                    
-                    if get_setting('settings.content_settings.playback_action.show_poster'): photo_url = media_details.get('poster_url')
-                    if EMBY_REMOTE_URL and get_setting('settings.content_settings.playback_action.show_view_on_server_button'):
-                        item_id, server_id = item.get('Id'), item.get('ServerId') or event_data.get('Server', {}).get('Id')
-                        if item_id and server_id:
-                            button = {'text': '▶️ 在服务器中查看', 'url': f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"}
-                            buttons.append([button])
+                message = "\n".join(parts)
+                print(f"✉️ 向管理员 {ADMIN_USER_ID} 发送播放通知。")
+                
+                buttons = []
+                photo_url = None
+                if get_setting('settings.content_settings.playback_action.show_poster'): photo_url = media_details.get('poster_url')
+                if EMBY_REMOTE_URL and get_setting('settings.content_settings.playback_action.show_view_on_server_button'):
+                    item_id, server_id = item.get('Id'), item.get('ServerId') or event_data.get('Server', {}).get('Id')
+                    if item_id and server_id:
+                        button = {'text': '▶️ 在服务器中查看', 'url': f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"}
+                        buttons.append([button])
 
-                    auto_delete_path_map = {'playback.start': 'settings.auto_delete_settings.playback_start', 'playback.unpause': 'settings.auto_delete_settings.playback_start','playback.pause': 'settings.auto_delete_settings.playback_pause', 'playback.stop': 'settings.auto_delete_settings.playback_stop'}
-                    auto_delete_path = auto_delete_path_map.get(event_type)
-                    if auto_delete_path and get_setting(auto_delete_path):
-                        send_deletable_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
-                    else:
-                        send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None)
-
-            self.send_response(200); self.end_headers(); return
+                auto_delete_path_map = {'playback.start': 'settings.auto_delete_settings.playback_start', 'playback.unpause': 'settings.auto_delete_settings.playback_start','playback.pause': 'settings.auto_delete_settings.playback_pause', 'playback.stop': 'settings.auto_delete_settings.playback_stop'}
+                auto_delete_path = auto_delete_path_map.get(event_type)
+                if auto_delete_path and get_setting(auto_delete_path):
+                    send_deletable_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None, delay_seconds=60)
+                else:
+                    send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID, inline_buttons=buttons if buttons else None)
+            
+            self.send_response(200)
+            self.end_headers()
+            return
 
         except Exception as e:
-            import traceback
-            print(f"处理 Webhook 请求时发生错误: {e}")
+            print(f"❌ 处理 Webhook 请求时发生错误: {e}")
             traceback.print_exc()
             self.send_response(500)
         finally:
             if not self.wfile.closed:
                 self.end_headers()
-
-class QuietWebhookHandler(WebhookHandler):
-    def log_message(self, format, *args):
-        pass
 
 
 class QuietWebhookHandler(WebhookHandler):
@@ -1544,10 +1690,6 @@ def run_server(server_class=HTTPServer, handler_class=WebhookHandler, port=8080)
     httpd = server_class(server_address, handler_class)
     print(f"服务器已在 http://0.0.0.0:{port} 启动...")
     httpd.serve_forever()
-
-class QuietWebhookHandler(WebhookHandler):
-    def log_message(self, format, *args):
-        pass
 
 if __name__ == '__main__':
     if not EMBY_USER_ID:
