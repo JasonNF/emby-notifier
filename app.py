@@ -1419,11 +1419,12 @@ def handle_telegram_command(message):
     print(f"➡️ 收到来自用户 {user_id} 在 Chat ID {chat_id} 的命令: {msg_text}")
 
     if not is_user_authorized(user_id):
-        print(f"🚫 已忽略来自非授权用户 {user_id} 的消息。")
+        print(f"🚫 已忽略来自未授权用户 {user_id} 的消息。")
         return
 
     is_group_chat = chat_id < 0
     is_reply = 'reply_to_message' in message
+    # mention 变量虽然在此处的 start 命令中不再使用，但为了其他命令的兼容性，予以保留
     mention = f"@{message['from'].get('username')} " if is_group_chat and message['from'].get('username') else ""
     is_awaiting_input = chat_id in user_search_state or chat_id in user_context
     
@@ -1459,8 +1460,6 @@ def handle_telegram_command(message):
                     elif state == 'awaiting_broadcast_message':
                         del user_context[chat_id]
                         
-                        # === 修复群发消息的逻辑 ===
-                        # 重新获取活跃会话，并只保留正在播放的会话
                         sessions_to_broadcast = [s for s in get_active_sessions() if s.get('NowPlayingItem')]
                         
                         if not sessions_to_broadcast:
@@ -1470,8 +1469,6 @@ def handle_telegram_command(message):
                             for session in sessions_to_broadcast:
                                 session_id = session.get('Id')
                                 if session_id:
-                                    # 注意这里 send_message_to_emby_session 的 chat_id 应该传 None，
-                                    # 以避免在群发失败时向你自己的私聊发送多条失败消息。
                                     send_message_to_emby_session(session_id, msg_text, None)
                                     count += 1
                             send_simple_telegram_message(f"✅ 已向 {count} 个会话发送群发消息。", chat_id)
@@ -1482,6 +1479,21 @@ def handle_telegram_command(message):
     if '@' in msg_text: msg_text = msg_text.split('@')[0]
     if not msg_text.startswith('/'): return
     command = msg_text.split()[0]
+
+    if command == '/start':
+        print(f"🚀 正在处理 /start 命令...")
+        welcome_text = (
+            escape_markdown("👋 欢迎使用 Emby机器人, !\n\n") +
+            escape_markdown("本机器人可以帮助您与 Emby 服务器进行交互。\n\n") +
+            escape_markdown("以下是您可以使用的命令：\n\n") +
+            "🔍 /search" + escape_markdown(" - 在Emby媒体库中搜索电影或剧集。\n") +
+            escape_markdown("    示例：/search 流浪地球 或者 /search 凡人修仙传 2025 \n\n") +
+            "📊 /status" + escape_markdown(" - 查看Emby服务器上的当前播放状态（仅限服务器管理员）。\n\n") +
+            "⚙️ /settings" + escape_markdown(" - 进入交互式菜单以配置机器人通知和功能（仅限服务器管理员）。\n\n") +
+            escape_markdown("您可以直接输入命令开始使用。")
+        )
+        send_telegram_notification(text=welcome_text, chat_id=chat_id, disable_preview=True)
+        return
 
     if command in ['/status', '/settings']:
         if not is_super_admin(user_id):
