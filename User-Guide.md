@@ -361,7 +361,7 @@ docker compose up -d
 - `settings.timezone`：影响推送中的时间戳显示，如 `Asia/Shanghai`
 
 ### 媒体根路径
-- `settings.media_base_path`：用于从路径推断节目分类（电影/剧集等）
+- `settings.media_base_path`：用于从路径推断节目分类（国产剧/动漫/外语电影等）
 
 ### 海报缓存
 - `settings.poster_cache_ttl_days`：缓存 TMDB 海报 URL 的有效天数
