@@ -296,11 +296,18 @@ docker compose up -d
    ```
    - 若 Docker 部署在 Emby 同一台主机，可写 `http://host.docker.internal:8080/`（Windows/Mac），Linux 用宿主机 IP
 3. 选择要推送的 **事件类型**（脚本支持）：
-   - `library.new`
-   - `library.deleted`
-   - `playback.start` / `playback.unpause`
-   - `playback.pause`
-   - `playback.stop`
+
+   **播放**
+   - 开始
+   - 暂停
+   - 取消暂停
+   - 停止
+
+   **媒体库**
+   - 新媒体已添加 
+   - 媒体删除
+   - 按剧集和专辑对通知进行分组
+
 4. 保存并应用
 
 > 提示：脚本已兼容 `Content-Type: application/json` 与 `application/x-www-form-urlencoded`（`data=` 字段）的两种推送格式。
@@ -312,9 +319,9 @@ docker compose up -d
 ### `/start`
 - 输出简要帮助
 
-### `/search <关键词 或 关键词+年份>`
-- 在 Emby 库中搜索电影/剧集  
-- 也可只输入 `/search` → 机器人等待你**回复**关键词（群里需 **回复** 提示消息）
+### `/search`
+- 输入 `/search <关键词 或 关键词+年份>` ，从而在 Emby 库中搜索电影/剧集  
+- 也可只输入 `/search` ，然后机器人等待你**回复**关键词（群里需 **回复** 提示消息）
 
 ### `/status`（仅超级管理员）
 - 拉取所有正在播放的会话并展示细节
@@ -404,13 +411,3 @@ docker logs -f emby-notifier
 - `config.yaml` 含有敏感信息（Token、API Key），请限制文件权限与目录访问
 - 定期备份 `/config/` 目录（尤其是 `config.yaml` 与 `cache/`）
 - 如部署在公网，建议用反向代理（Nginx/Caddy）加 TLS 保护 Emby 与远程面板
-
----
-
-## 小结
-1. **准备 Token/ID**：BotFather 拿 `token`，查 `admin_user_id`、群/频道 `chat_id`
-2. **写好 `config.yaml`** 并挂载到容器 `/config`
-3. **Docker 启动**：映射 `8080:8080`
-4. **Emby 配置 Webhook**：指向 `http://宿主:8080/`，勾选事件
-5. **Telegram 权限**：群/频道设机器人为管理员，授予“删除消息/发消息”
-6. **使用**：`/start`、`/search`、`/status`（管理员）、`/settings`（管理员）
