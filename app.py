@@ -1483,7 +1483,7 @@ def handle_telegram_command(message):
     if command == '/start':
         print(f"🚀 正在处理 /start 命令...")
         welcome_text = (
-            escape_markdown("👋 欢迎使用 Emby机器人, !\n\n") +
+            escape_markdown("👋 欢迎使用 Emby机器人!\n\n") +
             escape_markdown("本机器人可以帮助您与 Emby 服务器进行交互。\n\n") +
             escape_markdown("以下是您可以使用的命令：\n\n") +
             "🔍 /search" + escape_markdown(" - 在Emby媒体库中搜索电影或剧集。\n") +
