@@ -123,7 +123,7 @@ SETTINGS_MENU_STRUCTURE = {
     'series_show_overview': {'label': '展示剧情', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_overview', 'default': True},  # 剧集详情是否展示剧情
     'series_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_view_on_server_button', 'default': True},  # 剧集详情是否展示“在服务器中查看”按钮
     'series_season_specs': {'label': '各季规格', 'parent': 'search_series', 'children': ['series_season_show_video_spec', 'series_season_show_audio_spec']},  # 剧集各季规格子菜单
-    'series_season_show_video_spec': {'label': '展示视频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_video_spec', 'default': True},  # 剧集各季是否展示视频规格
+    'series_season_show_video_spec': {'label': '展示各季视频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_video_spec', 'default': True},  # 剧集各季是否展示视频规格
     'series_season_show_audio_spec': {'label': '展示各季音频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_audio_spec', 'default': True},  # 剧集各季是否展示音频规格
     'series_update_progress': {'label': '更新进度', 'parent': 'search_series', 'children': ['series_progress_show_latest_episode', 'series_progress_latest_episode_has_tmdb_link', 'series_progress_show_overview', 'series_progress_show_added_time', 'series_progress_show_progress_status']},  # 剧集更新进度子菜单
     'series_progress_show_latest_episode': {'label': '展示已更新至', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_latest_episode', 'default': True},  # 剧集更新进度是否展示最新剧集信息
@@ -333,7 +333,7 @@ def make_request_with_retry(method, url, max_retries=3, retry_delay=1, **kwargs)
     api_name = "Unknown API"
     if "api.telegram.org" in url: api_name = "Telegram"
     elif "api.themoviedb.org" in url: api_name = "TMDB"
-    elif "ip-api.com" in url: api_name = "IP Geolocation"
+    elif "opendata.baidu.com" in url: api_name = "IP Geolocation"
     elif EMBY_SERVER_URL and EMBY_SERVER_URL in url: api_name = "Emby"
     attempts = 0
     while attempts < max_retries:
@@ -400,20 +400,28 @@ def get_ip_geolocation(ip):
     """通过IP地址获取地理位置信息。"""
     if not ip or ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.'):
         return "局域网"
-    url = f"http://ip-api.com/json/{ip}?fields=status,message,country,regionName,city,isp&lang=zh-CN"
+    
+    url = f"https://opendata.baidu.com/api.php?co=&resource_id=6006&oe=utf8&query={ip}"
+    
     response = make_request_with_retry('GET', url, timeout=5)
-    if response and response.json().get('status') == 'success':
-        data = response.json()
-        isp_map = {
-            'Chinanet': '中国电信', 'China Telecom': '中国电信', 'China Unicom': '中国联通', 'CHINA169': '中国联通',
-            'CNC Group': '中国联通', 'China Netcom': '中国联通', 'China Mobile': '中国移动', 'China Broadcasting': '中国广电',
-            'Tencent': '腾讯云', 'Alibaba': '阿里云'
-        }
-        isp_en = data.get('isp', '')
-        isp = next((name for keyword, name in isp_map.items() if keyword.lower() in isp_en.lower()), isp_en)
-        parts = [data.get('country', ''), data.get('regionName', ''), data.get('city', ''), isp]
-        location = ' '.join([part for part in parts if part])
-        return location if location.strip() else "未知位置"
+    
+    if response:
+        try:
+            data = response.json()
+            if data.get('status') == '0' and data.get('data'):
+                location_info = data['data'][0].get('location')
+                if location_info:
+                    print(f"✅ 成功从百度 API 获取到 IP ({ip}) 的地理位置: {location_info}")
+                    return location_info
+                else:
+                    print(f"⚠️ 百度 API 响应成功，但未找到 location 信息。 IP: {ip}")
+            else:
+                error_msg = data.get('message', '未知错误')
+                print(f"❌ 百度 API 查询失败。IP: {ip}, 状态码: {data.get('status')}, 信息: {error_msg}")
+
+        except (json.JSONDecodeError, IndexError, KeyError) as e:
+            print(f"❌ 解析百度 API 响应时发生错误。IP: {ip}, 错误: {e}")
+    
     return "未知位置"
 
 def search_tmdb_by_title(title, year=None, media_type='tv'):
