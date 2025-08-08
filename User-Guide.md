@@ -65,6 +65,7 @@
 ```
 
 ### `config.yaml` 最小可用示例（按需修改）
+📄 以下为最小可用示例，完整配置文件说明参见：  👉 [config/config.yaml](https://github.com/xpisce/emby-notifier/blob/main/config/config.yaml)
 ```yaml
 telegram:
   token: "YOUR_TELEGRAM_BOT_TOKEN"
