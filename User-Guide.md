@@ -1,4 +1,4 @@
-# Emby Telegram Notification Bot 使用说明（Docker 部署 + Telegram/Emby 配置 + 管理菜单）
+# Emby Telegram Notification Bot 使用说明
 
 > 本说明适用于你贴出的同名 Python 脚本。脚本特性：  
 > - 监听 **Emby Webhook**（容器内端口 `8080`）  
