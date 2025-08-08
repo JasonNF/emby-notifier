@@ -2,6 +2,13 @@
 
 📺 一个为 Emby 服务器的管理员打造的全功能 Telegram Bot，支持媒体事件推送、搜索交互、播放状态控制、精细化权限与展示设置，并具备自动消息删除功能。适用于家庭服务器、媒体分享群组等多种场景，支持 Docker 快速部署。
 
+
+### ⚙️ 使用说明
+
+📄 详细使用说明参见：  👉 [User-Guide.md](https://github.com/xpisce/emby-notifier/blob/main/README.md)
+
+📄 完整配置文件参见：  👉 [config/config.yaml](https://github.com/xpisce/emby-notifier/blob/main/config/config.yaml)
+
 ---
 
 ## ✨ 项目亮点
@@ -28,100 +35,6 @@
 | 通知管理     | 通过 `notification_management` 控制哪些事件启用通知，推送到哪类聊天 |
 | 自动撤回     | 可配置哪些类型通知在发送后定时撤回，避免消息冗余 |
 | 权限与安全   | 支持限制机器人只在特定群组响应命令，部分命令仅管理员可用 |
-
----
-
-## ⚙️ 配置文件说明（config.yaml）
-
-📄 示例完整配置文件请参见：  
-👉 [config/config.yaml](https://github.com/xpisce/emby-notifier/blob/main/config/config.yaml)
-
-### Emby 服务器设置
-
-```yaml
-emby:
-  server_url: "http://192.168.100.1:8096"
-  api_key: "your_emby_api_key"
-  user_id: "your_emby_user_id"
-  remote_url: "https://emby.example.com"
-  app_scheme: "emby"
-```
-
-### Telegram Bot 设置
-
-```yaml
-telegram:
-  token: "your_telegram_bot_token"
-  group_id: "-100xxxxxxxx"
-  channel_id: "-100yyyyyyyy"
-  admin_user_id: "123456789"
-```
-
-### 内容展示控制（展示哪些字段、链接、规格等）
-
-```yaml
-settings:
-  content_settings:
-    new_library_notification:
-      show_poster: true
-      show_media_detail: true
-      media_detail_has_tmdb_link: true
-      show_overview: true
-      ...
-    status_feedback:
-      show_player: true
-      show_device: true
-      show_location: true
-      ...
-    search_display:
-      movie:
-        show_video_spec: true
-        show_audio_spec: true
-        ...
-```
-
-### 通知启用与投递设置
-
-```yaml
-notification_management:
-  library_new:
-    to_group: true
-    to_channel: true
-    to_private: true
-  playback_start: true
-  playback_pause: true
-  playback_stop: true
-  library_deleted: true
-```
-
-### 自动消息删除设置
-
-```yaml
-auto_delete_settings:
-  playback_start: true
-  playback_pause: true
-  playback_stop: true
-  new_library:
-    to_group: false
-    to_channel: false
-    to_private: true
-```
-
----
-
-## 🚀 快速部署（Docker）
-
-```bash
-docker run -d \
-  -v /your/config/path:/config \
-  -p 8080:8080 \
-  --restart=always \
-  xpisce/emby-notifier:latest
-```
-
-- 配置文件路径：`/config/config.yaml`  
-- 缓存目录：`/config/cache/`  
-- 默认监听端口：8080  
 
 ---
 
