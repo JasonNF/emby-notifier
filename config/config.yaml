@@ -137,7 +137,7 @@ telegram:
   token: 7969966:AAFYwUwrBpiHtashGGHkNBRyLC4 # Telegram机器人Token
   group_id: '-10027355757'                   # 用于接收群组通知的群组ID
   channel_id: '-10027657'                    # 用于接收频道通知的频道ID
-  admin_user_id: '7321438'                   # 管理员用户ID，用于接收私聊通知和执行管理命令
+  admin_user_id: '7321438'                   # 管理员用户ID，用于接收私聊通知和执行管理命令，/status和/settings命令仅对该用户有效
 
 # =======================================================
 # 第三方服务配置
