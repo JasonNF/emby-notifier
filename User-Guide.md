@@ -1,20 +1,21 @@
-# Emby Telegram Notification Bot 使用说明
+# 🎬 Emby Telegram Notification Bot 使用说明
 
 ## 📑 目录
-1. [准备工作](#-准备工作)
-2. [创建配置目录与文件](#-创建配置目录与文件)
-3. [用 Docker 运行](#-用-docker-运行)
-4. [在 Telegram 添加机器人并配置权限](#-在-telegram-添加机器人并配置权限)
-5. [将机器人加入群聊与频道并获取 Chat ID](#-将机器人加入群聊与频道并获取-chat-id)
-6. [配置 Emby Webhook](#-配置-emby-webhook)
-7. [常用命令与管理菜单](#-常用命令与管理菜单)
-8. [进阶设置与可选项](#-进阶设置与可选项)
-9. [注意事项](#-注意事项)
-10. [日志与排错](#-日志与排错)
-11. [安全与备份建议](#-安全与备份建议)
+1. [准备工作](#getting-started)
+2. [创建配置目录与文件](#config-files)
+3. [用 Docker 运行](#docker-run)
+4. [在 Telegram 添加机器人并配置权限](#telegram-bot-setup)
+5. [将机器人加入群聊与频道并获取 Chat ID](#join-chats-and-get-chat-id)
+6. [配置 Emby Webhook](#emby-webhook)
+7. [常用命令与管理菜单](#commands-and-settings-menu)
+8. [进阶设置与可选项](#advanced-settings)
+9. [注意事项](#notes)
+10. [日志与排错](#logs-and-troubleshooting)
+11. [安全与备份建议](#security-and-backup)
 
 ---
 
+<a id="getting-started"></a>
 ## 🧰 准备工作
 
 ### 1) 创建 Telegram 机器人（获取 `token`）
@@ -51,6 +52,7 @@
 
 ---
 
+<a id="config-files"></a>
 ## 📁 创建配置目录与文件
 
 ### 目录结构（建议）
@@ -195,6 +197,7 @@ settings:
 
 ---
 
+<a id="docker-run"></a>
 ## 🐳 用 Docker 运行
 
 ### 方式 A：`docker run`
@@ -228,7 +231,8 @@ docker compose up -d
 
 ---
 
-## 🤖🔧 在 Telegram 添加机器人并配置权限
+<a id="telegram-bot-setup"></a>
+## 🤖 在 Telegram 添加机器人并配置权限
 
 ### 私聊
 - 直接给你的机器人发送 `/start`，确认可正常响应
@@ -247,7 +251,8 @@ docker compose up -d
 
 ---
 
-## 📣 将机器人加入群聊与频道并获取 Chat ID
+<a id="join-chats-and-get-chat-id"></a>
+## 👥 将机器人加入群聊与频道并获取 Chat ID
 
 > 你需要 **群组 ID（负数）** 与 **频道 ID（通常以 `-100` 开头）**，写入 `config.yaml`：
 
@@ -276,6 +281,7 @@ docker compose up -d
 
 ---
 
+<a id="emby-webhook"></a>
 ## 🔔 配置 Emby Webhook
 
 > 目标：让 Emby 在发生事件时 **POST** 到 `http://<你的主机IP或域名>:8080/`
@@ -306,6 +312,7 @@ docker compose up -d
 
 ---
 
+<a id="commands-and-settings-menu"></a>
 ## ⌨️ 常用命令与管理菜单
 
 ### `/start`
@@ -342,6 +349,7 @@ docker compose up -d
 
 ---
 
+<a id="advanced-settings"></a>
 ## ⚙️ 进阶设置与可选项
 
 ### 代理
@@ -364,6 +372,7 @@ docker compose up -d
 
 ---
 
+<a id="notes"></a>
 ## ❗ 注意事项
 
 - `emby.user_id` 为必填项，否则节目信息将无法正确解析  
@@ -372,6 +381,7 @@ docker compose up -d
 
 ---
 
+<a id="logs-and-troubleshooting"></a>
 ## 🐞 日志与排错
 
 ### 查看日志
@@ -407,6 +417,7 @@ docker logs -f emby-notifier
 
 ---
 
+<a id="security-and-backup"></a>
 ## 🔒 安全与备份建议
 - `config.yaml` 含有敏感信息（Token、API Key），请限制文件权限与目录访问
 - 定期备份 `/config/` 目录（尤其是 `config.yaml` 与 `cache/`）
