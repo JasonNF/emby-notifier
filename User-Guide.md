@@ -43,7 +43,8 @@
 - `emby.api_key`：Emby 后台 → 高级 → **API 密钥** 生成
 - `emby.user_id`：用于调用部分用户上下文 API。可通过 Emby 后台用户列表或 API 获取
 - `emby.remote_url`：公网可访问的 Emby Web（用于生成 “在服务器中查看” 按钮）
-- （可选）`emby.app_scheme`：预留
+- `emby.username` 与 `emby.password`：（可选）用于执行删除媒体等高级操作，机器人会用此账号密码获取临时的管理员权限。
+- `emby.app_scheme`：（可选）预留
 
 ### 5) 网络代理（可选）
 - 如果 Telegram/TMDB 访问受限，设置 `proxy.http_proxy`，格式：  
@@ -61,7 +62,8 @@
 └── config/
     ├── config.yaml
     └── cache/
-        └── (运行时自动生成 poster_cache.json、languages.json 可选)
+        ├── poster_cache.json (运行时自动生成 )
+        └── languages.json (可选，用于将音频的语言显示为中文，可以直接下载https://github.com/xpisce/emby-notifier/blob/main/cache/languages.json使用）
 ```
 
 ### `config.yaml` 最小可用示例（按需修改）
@@ -83,6 +85,8 @@ emby:
   server_url: "http://192.168.1.10:8096"
   api_key: "YOUR_EMBY_API_KEY"
   user_id: "YOUR_EMBY_USER_ID"
+  username: "YOUR_EMBY_USERNAME"  # 可选，用于执行删除等高级操作
+  password: "YOUR_EMBY_PASSWORD"  # 可选，用于执行删除等高级操作
   remote_url: "https://emby.example.com"   # 公网访问地址，供按钮跳转
   app_scheme: ""                # 预留
 
@@ -208,7 +212,15 @@ sudo mkdir -p /opt/emby-notifier/config
 # 将上面的 config.yaml 放到 /opt/emby-notifier/config/config.yaml
 
 # 2) 运行容器（假设镜像为 xpisce/emby-notifier:latest）
-docker run -d   --name emby-notifier   -p 8080:8080   -v /opt/emby-notifier/config:/config   --restart unless-stopped   xpisce/emby-notifier:latest
+docker run -d \
+  --name emby-notifier \
+  -p 8080:8080 \
+  -v /opt/emby-notifier/config:/config \
+  # 如果要使用文件管理功能，请取消以下两行的注释，并替换为你的实际路径
+ # -v /path/to/your/media:/media \
+ # -v /path/to/your/cloud:/cloud \
+  --restart unless-stopped \
+  xpisce/emby-notifier:latest
 ```
 
 ### 方式 B：`docker-compose`
@@ -222,6 +234,9 @@ services:
       - "8080:8080"           # Emby Webhook 将 POST 到这个端口
     volumes:
       - /opt/emby-notifier/config:/config
+      # 如果要使用文件管理功能，请取消以下两行的注释，并替换为你的实际路径
+     # - /path/to/your/media:/media
+     # - /path/to/your/cloud:/cloud
     restart: unless-stopped
 ```
 ```bash
@@ -314,7 +329,7 @@ docker compose up -d
 ---
 
 <a id="commands-and-settings-menu"></a>
-## ⌨️ 常用命令与管理菜单
+## ⌨️ 命令与管理菜单
 
 ### `/start`
 - 输出简要帮助
@@ -331,6 +346,19 @@ docker compose up -d
   - 播放进度（百分比/时间）
   - “在服务器中查看”按钮
   - 管理按钮：**终止会话**、**发送消息**、**群发消息**、**终止所有**
+ 
+### `/manage`（仅超级管理员）
+- 直接输入 /manage 会弹出交互式菜单，可选择“管理已有节目”或“从网盘更新”。
+- 输入 /manage <关键词 或 TMDB ID> 可直接搜索要管理的节目。
+- 核心功能：
+  更新文件：将网盘中的文件更新/同步到本地目录中，.nfo、.jpg 等元素据文件会直接复制到本地，.mkv等视频文件会在本地创建 .strm 链接。
+  添加入库：通过引导式流程，输入节目信息，机器人会自动解析云端目录中的 .nfo 文件并执行更新操作。
+  删除节目：提供精细化删除选项，可选择：
+  - 仅从 Emby 媒体库中删除。
+  - 删除本地文件。
+  - 删除网盘文件。
+  - 同时删除本地与网盘文件。
+> 所有危险操作均有二次确认。
 
 ### `/settings`（仅超级管理员）
 - 打开 **交互式管理菜单**：
