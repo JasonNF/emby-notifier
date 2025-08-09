@@ -424,6 +424,50 @@ def get_ip_geolocation(ip):
     
     return "未知位置"
 
+def search_tmdb_multi(title, year=None):
+    """
+    在TMDB上同时搜索电影和剧集，并返回一个包含标题和年份的结果列表。
+    :param title: 搜索关键词
+    :param year: 年份 (可选)
+    :return: 包含{'title': str, 'year': str}字典的列表
+    """
+    print(f"🔍 正在 TMDB 综合搜索: {title} ({year or '任意年份'})")
+    if not TMDB_API_TOKEN: return []
+    proxies = {'http': HTTP_PROXY, 'https': HTTP_PROXY} if HTTP_PROXY else None
+    
+    all_results = []
+    
+    for media_type in ['movie', 'tv']:
+        params = {'api_key': TMDB_API_TOKEN, 'query': title, 'language': 'zh-CN'}
+        if year:
+            if media_type == 'tv':
+                params['first_air_date_year'] = year
+            else:
+                params['year'] = year
+        
+        url = f"https://api.themoviedb.org/3/search/{media_type}"
+        response = make_request_with_retry('GET', url, params=params, timeout=10, proxies=proxies)
+        
+        if response:
+            results = response.json().get('results', [])
+            for item in results:
+                item_title = item.get('title') or item.get('name')
+                release_date = item.get('release_date') or item.get('first_air_date')
+                item_year = release_date.split('-')[0] if release_date else None
+                if item_title:
+                   all_results.append({'title': item_title.strip(), 'year': item_year})
+
+    unique_results = []
+    seen = set()
+    for res in all_results:
+        identifier = (res['title'], res['year'])
+        if identifier not in seen:
+            unique_results.append(res)
+            seen.add(identifier)
+
+    print(f"✅ TMDB 综合搜索找到 {len(unique_results)} 个唯一结果。")
+    return unique_results
+
 def search_tmdb_by_title(title, year=None, media_type='tv'):
     """通过标题和年份在TMDB上搜索媒体。"""
     print(f"🔍 正在 TMDB 搜索: {title} ({year})")
@@ -807,7 +851,7 @@ def get_active_sessions_info(user_id):
                 if get_setting('settings.content_settings.status_feedback.show_terminate_session_button'):
                     action_button_row.append({'text': '❌ 终止会话', 'callback_data': f'session_terminate_{session_id}_{user_id}'})
                 if get_setting('settings.content_settings.status_feedback.show_send_message_button'):
-                    action_button_row.append({'text': '💬 发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
+                    action_button_row.append({'text': '   发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
             if action_button_row: buttons.append(action_button_row)
             
             # 将此会话的完整信息添加到列表中
@@ -956,7 +1000,7 @@ def get_tmdb_season_details(series_tmdb_id, season_number):
 
 def send_search_emby_and_format(query, chat_id, user_id, is_group_chat, mention):
     """
-    执行Emby搜索并格式化结果。
+    执行Emby搜索并格式化结果。如果Emby直接搜索无果，则尝试通过TMDB进行后备搜索。
     :param query: 搜索关键词
     :param chat_id: 聊天ID
     :param user_id: 用户ID
@@ -964,37 +1008,85 @@ def send_search_emby_and_format(query, chat_id, user_id, is_group_chat, mention)
     :param mention: @用户名字符串
     """
     print(f"🔍 用户 {user_id} 发起了 Emby 搜索，查询: {query}")
-    search_term = query.strip()
+    original_query = query.strip()
+    search_term = original_query
+    
     match = re.search(r'(\d{4})$', search_term)
     year_for_filter = match.group(1) if match else None
-    if match: search_term = search_term[:match.start()].strip()
+    if match: 
+        search_term = search_term[:match.start()].strip()
+
     if not search_term:
         send_deletable_telegram_notification("关键词无效！", chat_id=chat_id)
         return
+
     request_user_id = EMBY_USER_ID
     if not request_user_id:
         send_deletable_telegram_notification("错误：机器人管理员尚未在配置文件中设置 Emby `user_id`。", chat_id=chat_id)
         return
+
     url = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items"
     params = {
-        'api_key': EMBY_API_KEY, 'SearchTerm': search_term, 'IncludeItemTypes': 'Movie,Series',
-        'Recursive': 'true', 'Fields': 'ProviderIds,Path,ProductionYear,Name'
+        'api_key': EMBY_API_KEY, 
+        'SearchTerm': search_term, 
+        'IncludeItemTypes': 'Movie,Series',
+        'Recursive': 'true', 
+        'Fields': 'ProviderIds,Path,ProductionYear,Name'
     }
-    if year_for_filter: params['Years'] = year_for_filter
+    if year_for_filter: 
+        params['Years'] = year_for_filter
+        
     response = make_request_with_retry('GET', url, params=params, timeout=20)
-    if not response:
-        send_deletable_telegram_notification(f"搜索失败，无法连接到 Emby API。", chat_id=chat_id)
-        return
-    results = response.json().get('Items', [])
+    results = response.json().get('Items', []) if response else []
+
+    intro_override = None
+
     if not results:
-        send_deletable_telegram_notification(f"在 Emby 中找不到与“{escape_markdown(query)}”相关的任何内容。", chat_id=chat_id)
+        print(f"ℹ️ Emby 中未直接找到 '{original_query}'，尝试 TMDB 后备搜索。")
+        tmdb_alternatives = search_tmdb_multi(search_term, year_for_filter)
+        
+        alternative_results = []
+        found_emby_ids = set()
+
+        if tmdb_alternatives:
+            for alt in tmdb_alternatives:
+                alt_title = alt['title']
+                alt_params = {
+                    'api_key': EMBY_API_KEY, 
+                    'SearchTerm': alt_title, 
+                    'IncludeItemTypes': 'Movie,Series',
+                    'Recursive': 'true', 
+                    'Fields': 'ProviderIds,Path,ProductionYear,Name'
+                }
+                if year_for_filter:
+                    alt_params['Years'] = year_for_filter
+
+                alt_response = make_request_with_retry('GET', url, params=alt_params, timeout=10)
+                
+                if alt_response:
+                    emby_items = alt_response.json().get('Items', [])
+                    for item in emby_items:
+                        if item.get('Name').lower() == alt_title.lower() and item.get('Id') not in found_emby_ids:
+                            alternative_results.append(item)
+                            found_emby_ids.add(item.get('Id'))
+        
+        if not alternative_results:
+            send_deletable_telegram_notification(f"在 Emby 中找不到与“{escape_markdown(original_query)}”相关的任何内容。", chat_id=chat_id)
+            return
+        else:
+            results = alternative_results
+            intro_override = f"未在Emby服务器中找到同名的节目，但为您找到了以“{escape_markdown(search_term)}”为别名的节目："
+    
+    if not results:
         return
+
     search_id = str(uuid.uuid4())
     SEARCH_RESULTS_CACHE[search_id] = results
     print(f"✅ 搜索成功，找到 {len(results)} 个结果，缓存 ID: {search_id}")
-    send_search_results_page(chat_id, search_id, user_id, page=1)
+    
+    send_search_results_page(chat_id, search_id, user_id, page=1, intro_message_override=intro_override)
 
-def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=None):
+def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=None, intro_message_override=None):
     """
     发送搜索结果的某一页。
     :param chat_id: 聊天ID
@@ -1002,6 +1094,7 @@ def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=Non
     :param user_id: 用户ID
     :param page: 页码
     :param message_id: 要编辑的消息ID
+    :param intro_message_override: 用于覆盖默认介绍语的自定义字符串
     """
     print(f"📄 正在发送搜索结果第 {page} 页，缓存 ID: {search_id}")
     if search_id not in SEARCH_RESULTS_CACHE:
@@ -1014,7 +1107,12 @@ def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=Non
     start_index = (page - 1) * items_per_page
     end_index = start_index + items_per_page
     page_items = results[start_index:end_index]
-    message_text = "查询到以下节目，点击名称可查看详情："
+    
+    if intro_message_override:
+        message_text = intro_message_override
+    else:
+        message_text = "查询到以下节目，点击名称可查看详情："
+        
     buttons = []
     for i, item in enumerate(page_items):
         raw_title = item.get('Name', '未知标题')
@@ -1025,10 +1123,12 @@ def send_search_results_page(chat_id, search_id, user_id, page=1, message_id=Non
             raw_program_type = get_program_type_from_path(item.get('Path'))
             if raw_program_type: button_text += f" | {raw_program_type}"
         buttons.append([{'text': button_text, 'callback_data': f's_detail_{search_id}_{start_index + i}_{user_id}'}])
+    
     page_buttons = []
     if page > 1: page_buttons.append({'text': '◀️ 上一页', 'callback_data': f's_page_{search_id}_{page-1}_{user_id}'})
     if end_index < len(results): page_buttons.append({'text': '下一页 ▶️', 'callback_data': f's_page_{search_id}_{page+1}_{user_id}'})
     if page_buttons: buttons.append(page_buttons)
+    
     if message_id: edit_telegram_message(chat_id, message_id, message_text, inline_buttons=buttons)
     else: send_deletable_telegram_notification(message_text, chat_id=chat_id, inline_buttons=buttons, delay_seconds=90)
 
@@ -1491,7 +1591,7 @@ def handle_telegram_command(message):
     if command == '/start':
         print(f"🚀 正在处理 /start 命令...")
         welcome_text = (
-            escape_markdown("👋 欢迎使用 Emby机器人!\n\n") +
+            escape_markdown("👋 欢迎使用 Emby机器人！\n\n") +
             escape_markdown("本机器人可以帮助您与 Emby 服务器进行交互。\n\n") +
             escape_markdown("以下是您可以使用的命令：\n\n") +
             "🔍 /search" + escape_markdown(" - 在Emby媒体库中搜索电影或剧集。\n") +
