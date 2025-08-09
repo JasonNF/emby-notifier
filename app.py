@@ -68,10 +68,10 @@ SETTINGS_MENU_STRUCTURE = {
     'status_show_overview': {'label': '展示剧情', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_overview', 'default': False},  # 状态反馈是否展示剧情
     'status_show_timestamp': {'label': '展示时间', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_timestamp', 'default': True},  # 状态反馈是否展示时间
     'status_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_view_on_server_button', 'default': True},  # 状态反馈是否展示“在服务器中查看”按钮
-    'status_show_terminate_session_button': {'label': '展示“终止会话”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_session_button', 'default': True},  # 状态反馈是否展示“终止会话”按钮
+    'status_show_terminate_session_button': {'label': '展示“停止播放”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_session_button', 'default': True},  # 状态反馈是否展示“停止播放”按钮
     'status_show_send_message_button': {'label': '展示“发送消息”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_send_message_button', 'default': True},  # 状态反馈是否展示“发送消息”按钮
     'status_show_broadcast_button': {'label': '展示“群发消息”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_broadcast_button', 'default': True},  # 状态反馈是否展示“群发消息”按钮
-    'status_show_terminate_all_button': {'label': '展示“终止所有”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_all_button', 'default': True},  # 状态反馈是否展示“终止所有”按钮
+    'status_show_terminate_all_button': {'label': '展示“停止所有”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_all_button', 'default': True},  # 状态反馈是否展示“停止所有”按钮
     'playback_action': {'label': '播放行为推送内容设置', 'parent': 'content_settings', 'children': [
         'playback_show_poster', 'playback_show_media_detail', 'playback_media_detail_has_tmdb_link', 'playback_show_user', 'playback_show_player', 'playback_show_device', 'playback_show_location', 'playback_show_progress',
         'playback_show_video_spec', 'playback_show_audio_spec', 'playback_show_media_type', 'playback_show_overview', 'playback_show_timestamp', 'playback_show_view_on_server_button'
@@ -843,15 +843,15 @@ def get_active_sessions_info(user_id):
                 item_id, server_id = item.get('Id'), item.get('ServerId')
                 if item_id and server_id:
                     item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
-                    view_button_row.append({'text': '▶️ 在服务器中查看', 'url': item_url})
+                    view_button_row.append({'text': '➡️ 在服务器中查看', 'url': item_url})
             if view_button_row: buttons.append(view_button_row)
             
             action_button_row = []
             if session_id:
                 if get_setting('settings.content_settings.status_feedback.show_terminate_session_button'):
-                    action_button_row.append({'text': '❌ 终止会话', 'callback_data': f'session_terminate_{session_id}_{user_id}'})
+                    action_button_row.append({'text': '⏹️ 停止播放', 'callback_data': f'session_terminate_{session_id}_{user_id}'})
                 if get_setting('settings.content_settings.status_feedback.show_send_message_button'):
-                    action_button_row.append({'text': '💬 发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
+                    action_button_row.append({'text': '✉️ 发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
             if action_button_row: buttons.append(action_button_row)
             
             # 将此会话的完整信息添加到列表中
@@ -873,20 +873,20 @@ def get_active_sessions_info(user_id):
     return sessions_data
 
 def terminate_emby_session(session_id, chat_id):
-    """终止指定的Emby会话。"""
-    print(f"🛑 正在尝试终止会话: {session_id}")
+    """停止指定的Emby播放会话。"""
+    print(f"🛑 正在尝试停止播放会话: {session_id}")
     if not all([EMBY_SERVER_URL, EMBY_API_KEY, session_id]):
-        if chat_id: send_simple_telegram_message("错误：缺少终止会话所需的服务器配置。", chat_id)
+        if chat_id: send_simple_telegram_message("错误：缺少停止播放所需的服务器配置。", chat_id)
         return False
     url = f"{EMBY_SERVER_URL}/Sessions/{session_id}/Playing/Stop"
     params = {'api_key': EMBY_API_KEY}
     response = make_request_with_retry('POST', url, params=params, timeout=10)
     if response:
-        print(f"✅ 会话 {session_id} 已成功终止。")
+        print(f"✅ 播放 {session_id} 已成功停止。")
         return True
     else:
-        if chat_id: send_simple_telegram_message(f"终止会话 {escape_markdown(session_id)} 失败。", chat_id)
-        print(f"❌ 终止会话 {session_id} 失败。")
+        if chat_id: send_simple_telegram_message(f"停止播放会话 {escape_markdown(session_id)} 失败。", chat_id)
+        print(f"❌ 停止播放会话 {session_id} 失败。")
         return False
 
 def send_message_to_emby_session(session_id, message, chat_id):
@@ -1333,7 +1333,7 @@ def send_search_detail(chat_id, search_id, item_index, user_id):
         server_id = item.get('ServerId')
         if item_id and server_id:
             item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
-            buttons.append([{'text': '▶️ 在服务器中查看', 'url': item_url}])
+            buttons.append([{'text': '➡️ 在服务器中查看', 'url': item_url}])
     send_deletable_telegram_notification(
         "\n".join(filter(None, message_parts)),
         photo_url=final_poster_url, chat_id=chat_id,
@@ -1458,14 +1458,14 @@ def handle_callback_query(callback_query):
         
     # === 播放会话管理功能处理 ===
     if command == 'session':
-        # 处理“终止所有会话”和“群发消息”的确认或等待输入
+        # 处理“停止所有会话”和“群发消息”的确认或等待输入
         if main_data == 'terminateall':
             answer_callback_query(query_id)
             confirmation_buttons = [[
-                {'text': '⚠️ 是的，全部终止', 'callback_data': f'session_terminateall_confirm_{initiator_id}'},
+                {'text': '⚠️ 是的，全部停止', 'callback_data': f'session_terminateall_confirm_{initiator_id}'},
                 {'text': '取消', 'callback_data': f'action_cancel_{initiator_id}'}
             ]]
-            edit_telegram_message(chat_id, message_id, escape_markdown("❓ 您确定要终止*所有*正在播放的会话吗？此操作无法撤销。"), inline_buttons=confirmation_buttons)
+            edit_telegram_message(chat_id, message_id, escape_markdown("❓ 您确定要停止*所有*正在播放的会话吗？此操作无法撤销。"), inline_buttons=confirmation_buttons)
             return
         
         if main_data == 'broadcast':
@@ -1477,9 +1477,9 @@ def handle_callback_query(callback_query):
             send_deletable_telegram_notification(escape_markdown(prompt_text), chat_id=chat_id, delay_seconds=60)
             return
 
-        # 处理确认终止所有会话
+        # 处理确认停止所有会话
         if main_data == 'terminateall_confirm':
-            answer_callback_query(query_id, text="正在终止所有会话...", show_alert=False)
+            answer_callback_query(query_id, text="正在停止所有会话...", show_alert=False)
             
             # --- 关键的过滤逻辑 ---
             # 获取所有活跃会话，并只保留正在播放内容的会话
@@ -1493,7 +1493,7 @@ def handle_callback_query(callback_query):
                     session_id = session.get('Id')
                     if session_id and terminate_emby_session(session_id, None):
                         count += 1
-                edit_telegram_message(chat_id, message_id, f"✅ 操作完成，共终止了 {count} 个会话。")
+                edit_telegram_message(chat_id, message_id, f"✅ 操作完成，共停止了 {count} 个播放会话。")
             delete_user_message_later(chat_id, message_id, delay_seconds=60)
             return
 
@@ -1510,9 +1510,9 @@ def handle_callback_query(callback_query):
         if action == 'terminate':
             answer_callback_query(query_id)
             if terminate_emby_session(session_id, chat_id):
-                answer_callback_query(query_id, text="✅ 会话已成功终止。", show_alert=True)
+                answer_callback_query(query_id, text="✅ 播放已成功停止。", show_alert=True)
             else:
-                answer_callback_query(query_id, text="❌ 终止失败。", show_alert=True)
+                answer_callback_query(query_id, text="❌ 播放停止失败。", show_alert=True)
         elif action == 'message':
             answer_callback_query(query_id)
             user_context[chat_id] = {'state': 'awaiting_message_for_session', 'session_id': session_id, 'initiator_id': initiator_id}
@@ -1619,9 +1619,9 @@ def handle_telegram_command(message):
                 global_buttons = []
                 row = []
                 if get_setting('settings.content_settings.status_feedback.show_broadcast_button'):
-                    row.append({'text': '💬 群发消息', 'callback_data': f'session_broadcast_{user_id}'})
+                    row.append({'text': '✉️ 群发消息', 'callback_data': f'session_broadcast_{user_id}'})
                 if get_setting('settings.content_settings.status_feedback.show_terminate_all_button'):
-                    row.append({'text': '❌ 终止所有', 'callback_data': f'session_terminateall_{user_id}'})
+                    row.append({'text': '⏹️ 停止所有', 'callback_data': f'session_terminateall_{user_id}'})
                 if row: global_buttons.append(row)
                 send_deletable_telegram_notification(text=title_message, chat_id=chat_id, inline_buttons=global_buttons or None, disable_preview=True)
                 time.sleep(0.5)
@@ -1833,7 +1833,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     item_id, server_id = item.get('Id'), item.get('ServerId')
                     if item_id and server_id:
                         item_url = f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"
-                        buttons.append([{'text': '▶️ 在服务器中查看', 'url': item_url}])
+                        buttons.append([{'text': '➡️ 在服务器中查看', 'url': item_url}])
 
                 auto_delete_group = get_setting('settings.auto_delete_settings.new_library.to_group')
                 auto_delete_channel = get_setting('settings.auto_delete_settings.new_library.to_channel')
@@ -2027,7 +2027,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 if EMBY_REMOTE_URL and get_setting('settings.content_settings.playback_action.show_view_on_server_button'):
                     item_id, server_id = item.get('Id'), item.get('ServerId') or event_data.get('Server', {}).get('Id')
                     if item_id and server_id:
-                        button = {'text': '▶️ 在服务器中查看', 'url': f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"}
+                        button = {'text': '➡️ 在服务器中查看', 'url': f"{EMBY_REMOTE_URL}/web/index.html#!/item?id={item_id}&serverId={server_id}"}
                         buttons.append([button])
 
                 auto_delete_path_map = {'playback.start': 'settings.auto_delete_settings.playback_start', 'playback.unpause': 'settings.auto_delete_settings.playback_start','playback.pause': 'settings.auto_delete_settings.playback_pause', 'playback.stop': 'settings.auto_delete_settings.playback_stop'}
