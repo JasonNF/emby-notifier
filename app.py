@@ -851,7 +851,7 @@ def get_active_sessions_info(user_id):
                 if get_setting('settings.content_settings.status_feedback.show_terminate_session_button'):
                     action_button_row.append({'text': '❌ 终止会话', 'callback_data': f'session_terminate_{session_id}_{user_id}'})
                 if get_setting('settings.content_settings.status_feedback.show_send_message_button'):
-                    action_button_row.append({'text': '   发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
+                    action_button_row.append({'text': '💬 发送消息', 'callback_data': f'session_message_{session_id}_{user_id}'})
             if action_button_row: buttons.append(action_button_row)
             
             # 将此会话的完整信息添加到列表中
