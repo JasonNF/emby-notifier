@@ -5,7 +5,7 @@
 
 ### ⚙️ 使用说明
 
-📄 详细使用说明参见：  👉 [User-Guide.md](https://github.com/xpisce/emby-notifier/blob/main/User-Guide.md)
+📄 详细使用说明参见：  👉 [User-Guide.md](https://github.com/xpisce/emby-notifier/blob/main/User%20Guide/User-Guide.md)
 
 📄 完整配置文件参见：  👉 [config/config.yaml](https://github.com/xpisce/emby-notifier/blob/main/config/config.yaml)
 
@@ -42,12 +42,12 @@
 
 ## 🔧 命令说明（Telegram）
 
-| 命令 | 描述 | 权限要求 |
-|------------|-----------------------------------------|--------------|
-| `/search` | 搜索节目关键词，支持智能后备搜索，展示剧集更新状态与规格。 | 所有人 |
-| `/status` | 查看当前播放会话，支持远程控制。 | 管理员 |
-| `/settings`| 打开通知展示与开关设置交互菜单。 | 管理员 |
-| `/manage` | 管理媒体文件，支持更新、入库、删除等高级操作。 | 管理员 |
+| 命令 | 描述 | 权限要求 | 详细使用说明 |
+|------------|-----------------------------------------|--------------|--------------|
+| `/search` | 搜索节目关键词，支持智能后备搜索，展示剧集更新状态与规格。 | 所有人 | 👉 [userguide-search.md](https://github.com/xpisce/emby-notifier/blob/main/User%20Guide/userguide-search.md) |
+| `/status` | 查看当前播放会话，支持远程控制。 | 管理员 | 👉 [userguide-status.md](https://github.com/xpisce/emby-notifier/blob/main/User%20Guide/userguide-status.md) |
+| `/settings`| 打开通知展示与开关设置交互菜单。 | 管理员 | 👉 [userguide-settings.md](https://github.com/xpisce/emby-notifier/blob/main/User%20Guide/userguide-settings.md) |
+| `/manage` | 管理媒体文件，支持更新、入库、删除等高级操作。 | 管理员 | 👉 [userguide-manage.md](https://github.com/xpisce/emby-notifier/blob/main/User%20Guide/userguide-manage.md) |
 
 ---
 
