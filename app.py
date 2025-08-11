@@ -461,7 +461,7 @@ def parse_episode_ranges_from_description(description: str):
     if not first_line:
         return None, []
 
-    tokens = re.split(r'[，,]\s*', first_line)
+    tokens = re.split(r'[，,]\s*|/\s*', first_line)
     season_ctx = None
     summary_parts, expanded = [], []
 
