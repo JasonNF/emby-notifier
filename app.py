@@ -39,120 +39,124 @@ recent_playback_notifications = {}  # 最近播放通知的去重缓存
 user_context = {}  # 用户会话上下文（例如，等待用户回复）
 user_search_state = {}  # 用户搜索状态缓存
 UPDATE_PATH_CACHE = {}  # 用于在回调中传递更新路径的缓存
+EMBY_USERS_CACHE = {}   # 用于缓存Emby用户列
 
 # 设置菜单结构定义
 SETTINGS_MENU_STRUCTURE = {
-    'root': {'label': '⚙️ 主菜单', 'children': ['content_settings', 'notification_management', 'auto_delete_settings']},  # 根菜单节点
-    'content_settings': {'label': '推送内容设置', 'parent': 'root', 'children': ['status_feedback', 'playback_action', 'library_deleted_content', 'new_library_content_settings', 'search_display']},  # 内容设置子菜单
-    'new_library_content_settings': {'label': '新增节目通知内容设置', 'parent': 'content_settings', 'children': [
-    'new_library_show_poster', 'new_library_show_media_detail', 'new_library_media_detail_has_tmdb_link', 'new_library_show_overview', 'new_library_show_media_type',
-    'new_library_show_video_spec', 'new_library_show_audio_spec', 'new_library_show_progress_status', 'new_library_show_timestamp', 'new_library_show_view_on_server_button']},  # 新增内容通知子菜单
+    'root': {'label': '⚙️ 主菜单', 'children': ['content_settings', 'notification_management', 'auto_delete_settings']},
+    'content_settings': {'label': '推送内容设置', 'parent': 'root', 'children': ['status_feedback', 'playback_action', 'library_deleted_content', 'new_library_content_settings', 'search_display']},
+    'new_library_content_settings': {'label': '新增节目通知内容设置', 'parent': 'content_settings', 'children': ['new_library_show_poster', 'new_library_show_media_detail', 'new_library_media_detail_has_tmdb_link', 'new_library_show_overview', 'new_library_show_media_type', 'new_library_show_video_spec', 'new_library_show_audio_spec', 'new_library_show_subtitle_spec', 'new_library_show_progress_status', 'new_library_show_timestamp', 'new_library_show_view_on_server_button']},
     'new_library_show_progress_status': {'label': '展示更新进度/缺集', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_progress_status', 'default': True},
-    'new_library_show_poster': {'label': '展示海报', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_poster', 'default': True},  # 新增通知是否展示海报
-    'new_library_show_media_detail': {'label': '展示节目详情', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_media_detail', 'default': True},  # 新增通知是否展示节目详情
-    'new_library_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.media_detail_has_tmdb_link', 'default': True},  # 新增通知节目详情是否添加TMDB链接
-    'new_library_show_overview': {'label': '展示剧情', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_overview', 'default': True},  # 新增通知是否展示剧情
-    'new_library_show_media_type': {'label': '展示节目类型', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_media_type', 'default': True},  # 新增通知是否展示节目类型
-    'new_library_show_video_spec': {'label': '展示视频规格', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_video_spec', 'default': False},  # 新增通知是否展示视频规格
-    'new_library_show_audio_spec': {'label': '展示音频规格', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_audio_spec', 'default': False},  # 新增通知是否展示音频规格
-    'new_library_show_timestamp': {'label': '展示更新时间', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_timestamp', 'default': True},  # 新增通知是否展示更新时间
-    'new_library_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_view_on_server_button', 'default': True},  # 新增通知是否展示“在服务器中查看”按钮
-    'status_feedback': {'label': '观看状态反馈内容设置', 'parent': 'content_settings', 'children': [
-        'status_show_poster', 'status_show_player', 'status_show_device', 'status_show_location', 'status_show_media_detail', 'status_media_detail_has_tmdb_link', 'status_show_media_type', 'status_show_overview', 'status_show_timestamp',
-        'status_show_view_on_server_button', 'status_show_terminate_session_button', 'status_show_send_message_button', 'status_show_broadcast_button', 'status_show_terminate_all_button'
-    ]},  # 观看状态反馈子菜单
-    'status_show_poster': {'label': '展示海报', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_poster', 'default': True},  # 状态反馈是否展示海报
-    'status_show_player': {'label': '展示播放器', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_player', 'default': True},  # 状态反馈是否展示播放器
-    'status_show_device': {'label': '展示设备', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_device', 'default': True},  # 状态反馈是否展示设备
-    'status_show_location': {'label': '展示位置信息', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_location', 'default': True},  # 状态反馈是否展示位置信息
-    'status_show_media_detail': {'label': '展示节目详情', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_media_detail', 'default': True},  # 状态反馈是否展示节目详情
-    'status_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.media_detail_has_tmdb_link', 'default': True},  # 状态反馈节目详情是否添加TMDB链接
-    'status_show_media_type': {'label': '展示节目类型', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_media_type', 'default': True},  # 状态反馈是否展示节目类型
-    'status_show_overview': {'label': '展示剧情', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_overview', 'default': False},  # 状态反馈是否展示剧情
-    'status_show_timestamp': {'label': '展示时间', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_timestamp', 'default': True},  # 状态反馈是否展示时间
-    'status_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_view_on_server_button', 'default': True},  # 状态反馈是否展示“在服务器中查看”按钮
-    'status_show_terminate_session_button': {'label': '展示“停止播放”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_session_button', 'default': True},  # 状态反馈是否展示“停止播放”按钮
-    'status_show_send_message_button': {'label': '展示“发送消息”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_send_message_button', 'default': True},  # 状态反馈是否展示“发送消息”按钮
-    'status_show_broadcast_button': {'label': '展示“群发消息”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_broadcast_button', 'default': True},  # 状态反馈是否展示“群发消息”按钮
-    'status_show_terminate_all_button': {'label': '展示“停止所有”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_all_button', 'default': True},  # 状态反馈是否展示“停止所有”按钮
-    'playback_action': {'label': '播放行为推送内容设置', 'parent': 'content_settings', 'children': [
-        'playback_show_poster', 'playback_show_media_detail', 'playback_media_detail_has_tmdb_link', 'playback_show_user', 'playback_show_player', 'playback_show_device', 'playback_show_location', 'playback_show_progress',
-        'playback_show_video_spec', 'playback_show_audio_spec', 'playback_show_media_type', 'playback_show_overview', 'playback_show_timestamp', 'playback_show_view_on_server_button'
-    ]},  # 播放行为推送子菜单
-    'playback_show_poster': {'label': '展示海报', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_poster', 'default': True},  # 播放推送是否展示海报
-    'playback_show_media_detail': {'label': '展示节目详情', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_media_detail', 'default': True},  # 播放推送是否展示节目详情
-    'playback_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.media_detail_has_tmdb_link', 'default': True},  # 播放推送节目详情是否添加TMDB链接
-    'playback_show_user': {'label': '展示用户名', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_user', 'default': True},  # 播放推送是否展示用户名
-    'playback_show_player': {'label': '展示播放器', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_player', 'default': True},  # 播放推送是否展示播放器
-    'playback_show_device': {'label': '展示设备', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_device', 'default': True},  # 播放推送是否展示设备
-    'playback_show_location': {'label': '展示位置信息', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_location', 'default': True},  # 播放推送是否展示位置信息
-    'playback_show_progress': {'label': '展示播放进度', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_progress', 'default': True},  # 播放推送是否展示播放进度
-    'playback_show_video_spec': {'label': '展示视频规格', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_video_spec', 'default': False},  # 播放推送是否展示视频规格
-    'playback_show_audio_spec': {'label': '展示音频规格', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_audio_spec', 'default': False},  # 播放推送是否展示音频规格
-    'playback_show_media_type': {'label': '展示节目类型', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_media_type', 'default': True},  # 播放推送是否展示节目类型
-    'playback_show_overview': {'label': '展示剧情', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_overview', 'default': True},  # 播放推送是否展示剧情
-    'playback_show_timestamp': {'label': '展示时间', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_timestamp', 'default': True},  # 播放推送是否展示时间
-    'playback_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_view_on_server_button', 'default': True},  # 播放推送是否展示“在服务器中查看”按钮
-    'library_deleted_content': {'label': '删除节目通知内容设置', 'parent': 'content_settings', 'children': [
-        'deleted_show_poster', 'deleted_show_media_detail', 'deleted_media_detail_has_tmdb_link', 'deleted_show_overview', 'deleted_show_media_type', 'deleted_show_timestamp'
-    ]},  # 删除内容通知子菜单
-    'deleted_show_poster': {'label': '展示海报', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_poster', 'default': True},  # 删除通知是否展示海报
-    'deleted_show_media_detail': {'label': '展示节目详情', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_media_detail', 'default': True},  # 删除通知是否展示节目详情
-    'deleted_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.media_detail_has_tmdb_link', 'default': True},  # 删除通知节目详情是否添加TMDB链接
-    'deleted_show_overview': {'label': '展示剧情', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_overview', 'default': True},  # 删除通知是否展示剧情
-    'deleted_show_media_type': {'label': '展示节目类型', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_media_type', 'default': True},  # 删除通知是否展示节目类型
-    'deleted_show_timestamp': {'label': '展示删除时间', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_timestamp', 'default': True},  # 删除通知是否展示删除时间
-    'search_display': {'label': '搜索结果展示内容设置', 'parent': 'content_settings', 'children': ['search_show_media_type_in_list', 'search_movie', 'search_series']},  # 搜索结果展示子菜单
-    'search_show_media_type_in_list': {'label': '搜索结果列表展示节目分类', 'parent': 'search_display', 'config_path': 'settings.content_settings.search_display.show_media_type_in_list', 'default': True},  # 搜索列表是否展示节目分类
-    'search_movie': {'label': '电影展示设置', 'parent': 'search_display', 'children': [
-        'movie_show_poster', 'movie_title_has_tmdb_link', 'movie_show_type', 'movie_show_category', 'movie_show_overview', 'movie_show_video_spec', 'movie_show_audio_spec', 'movie_show_added_time', 'movie_show_view_on_server_button'
-    ]},  # 电影搜索结果子菜单
-    'search_series': {'label': '剧集展示设置', 'parent': 'search_display', 'children': [
-        'series_show_poster', 'series_title_has_tmdb_link', 'series_show_type', 'series_show_category', 'series_show_overview', 'series_season_specs', 'series_update_progress', 'series_show_view_on_server_button'
-    ]},  # 剧集搜索结果子菜单
-    'movie_show_poster': {'label': '展示海报', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_poster', 'default': True},  # 电影详情是否展示海报
-    'movie_title_has_tmdb_link': {'label': '电影名称添加TMDB链接', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.title_has_tmdb_link', 'default': True},  # 电影名称是否添加TMDB链接
-    'movie_show_type': {'label': '展示类型', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_type', 'default': True},  # 电影详情是否展示类型
-    'movie_show_category': {'label': '展示分类', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_category', 'default': True},  # 电影详情是否展示分类
-    'movie_show_overview': {'label': '展示剧情', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_overview', 'default': True},  # 电影详情是否展示剧情
-    'movie_show_video_spec': {'label': '展示视频规格', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_video_spec', 'default': True},  # 电影详情是否展示视频规格
-    'movie_show_audio_spec': {'label': '展示音频规格', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_audio_spec', 'default': True},  # 电影详情是否展示音频规格
-    'movie_show_added_time': {'label': '展示入库时间', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_added_time', 'default': True},  # 电影详情是否展示入库时间
-    'movie_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_view_on_server_button', 'default': True},  # 电影详情是否展示“在服务器中查看”按钮
-    'series_show_poster': {'label': '展示海报', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_poster', 'default': True},  # 剧集详情是否展示海报
-    'series_title_has_tmdb_link': {'label': '剧目名称添加TMDB链接', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.title_has_tmdb_link', 'default': True},  # 剧集名称是否添加TMDB链接
-    'series_show_type': {'label': '展示类型', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_type', 'default': True},  # 剧集详情是否展示类型
-    'series_show_category': {'label': '展示分类', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_category', 'default': True},  # 剧集详情是否展示分类
-    'series_show_overview': {'label': '展示剧情', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_overview', 'default': True},  # 剧集详情是否展示剧情
-    'series_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_view_on_server_button', 'default': True},  # 剧集详情是否展示“在服务器中查看”按钮
-    'series_season_specs': {'label': '各季规格', 'parent': 'search_series', 'children': ['series_season_show_video_spec', 'series_season_show_audio_spec']},  # 剧集各季规格子菜单
-    'series_season_show_video_spec': {'label': '展示各季视频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_video_spec', 'default': True},  # 剧集各季是否展示视频规格
-    'series_season_show_audio_spec': {'label': '展示各季音频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_audio_spec', 'default': True},  # 剧集各季是否展示音频规格
-    'series_update_progress': {'label': '更新进度', 'parent': 'search_series', 'children': ['series_progress_show_latest_episode', 'series_progress_latest_episode_has_tmdb_link', 'series_progress_show_overview', 'series_progress_show_added_time', 'series_progress_show_progress_status']},  # 剧集更新进度子菜单
-    'series_progress_show_latest_episode': {'label': '展示已更新至', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_latest_episode', 'default': True},  # 剧集更新进度是否展示最新剧集信息
-    'series_progress_latest_episode_has_tmdb_link': {'label': '已更新至添加TMDB链接', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.latest_episode_has_tmdb_link', 'default': True},  # 剧集更新信息是否添加TMDB链接
-    'series_progress_show_overview': {'label': '展示剧情', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_overview', 'default': False},  # 剧集更新信息是否展示剧情
-    'series_progress_show_added_time': {'label': '展示入库时间', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_added_time', 'default': True},  # 剧集更新信息是否展示入库时间
-    'series_progress_show_progress_status': {'label': '展示更新进度', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_progress_status', 'default': True},  # 剧集更新信息是否展示更新状态
-    'notification_management': {'label': '通知管理', 'parent': 'root', 'children': ['notify_library_new', 'notify_playback_start', 'notify_playback_pause', 'notify_playback_stop', 'notify_library_deleted']},  # 通知管理子菜单
-    'notify_library_new': {'label': '新增节目', 'parent': 'notification_management', 'children': ['new_to_group', 'new_to_channel', 'new_to_private']},  # 新增节目通知子菜单
-    'new_to_group': {'label': '到群组', 'parent': 'notify_library_new', 'config_path': 'settings.notification_management.library_new.to_group', 'default': True},  # 新增节目通知是否发送到群组
-    'new_to_channel': {'label': '到频道', 'parent': 'notify_library_new', 'config_path': 'settings.notification_management.library_new.to_channel', 'default': True},  # 新增节目通知是否发送到频道
-    'new_to_private': {'label': '到私聊', 'parent': 'notify_library_new', 'config_path': 'settings.notification_management.library_new.to_private', 'default': False},  # 新增节目通知是否发送到私聊
-    'notify_playback_start': {'label': '开始/继续播放', 'parent': 'notification_management', 'config_path': 'settings.notification_management.playback_start', 'default': True},  # 是否开启开始/继续播放通知
-    'notify_playback_pause': {'label': '暂停播放', 'parent': 'notification_management', 'config_path': 'settings.notification_management.playback_pause', 'default': False},  # 是否开启暂停播放通知
-    'notify_playback_stop': {'label': '停止播放', 'parent': 'notification_management', 'config_path': 'settings.notification_management.playback_stop', 'default': True},  # 是否开启停止播放通知
-    'notify_library_deleted': {'label': '删除节目', 'parent': 'notification_management', 'config_path': 'settings.notification_management.library_deleted', 'default': True},  # 是否开启删除节目通知
-    'auto_delete_settings': {'label': '自动删除消息设置', 'parent': 'root', 'children': ['delete_new_library', 'delete_library_deleted', 'delete_playback_status']},  # 自动删除消息子菜单
-    'delete_new_library': {'label': '新增节目通知消息', 'parent': 'auto_delete_settings', 'children': ['delete_new_library_group', 'delete_new_library_channel', 'delete_new_library_private']},  # 新增节目自动删除子菜单
-    'delete_new_library_group': {'label': '到群组', 'parent': 'delete_new_library', 'config_path': 'settings.auto_delete_settings.new_library.to_group', 'default': False},  # 群组新增通知是否自动删除
-    'delete_new_library_channel': {'label': '到频道', 'parent': 'delete_new_library', 'config_path': 'settings.auto_delete_settings.new_library.to_channel', 'default': False},  # 频道新增通知是否自动删除
-    'delete_new_library_private': {'label': '到私聊', 'parent': 'delete_new_library', 'config_path': 'settings.auto_delete_settings.new_library.to_private', 'default': True},  # 私聊新增通知是否自动删除
-    'delete_library_deleted': {'label': '删除节目通知消息', 'parent': 'auto_delete_settings', 'config_path': 'settings.auto_delete_settings.library_deleted', 'default': True},  # 删除节目通知是否自动删除
-    'delete_playback_status': {'label': '播放状态通知消息', 'parent': 'auto_delete_settings', 'children': ['delete_playback_start', 'delete_playback_pause', 'delete_playback_stop']},  # 播放状态自动删除子菜单
-    'delete_playback_start': {'label': '开始/继续播放通知消息', 'parent': 'delete_playback_status', 'config_path': 'settings.auto_delete_settings.playback_start', 'default': True},  # 开始/继续播放通知是否自动删除
-    'delete_playback_pause': {'label': '暂停播放通知消息', 'parent': 'delete_playback_status', 'config_path': 'settings.auto_delete_settings.playback_pause', 'default': True},  # 暂停播放通知是否自动删除
-    'delete_playback_stop': {'label': '停止播放通知消息', 'parent': 'delete_playback_status', 'config_path': 'settings.auto_delete_settings.playback_stop', 'default': True},  # 停止播放通知是否自动删除
+    'new_library_show_poster': {'label': '展示海报', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_poster', 'default': True},
+    'new_library_show_media_detail': {'label': '展示节目详情', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_media_detail', 'default': True},
+    'new_library_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.media_detail_has_tmdb_link', 'default': True},
+    'new_library_show_overview': {'label': '展示剧情', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_overview', 'default': True},
+    'new_library_show_media_type': {'label': '展示节目类型', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_media_type', 'default': True},
+    'new_library_show_video_spec': {'label': '展示视频规格', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_video_spec', 'default': False},
+    'new_library_show_audio_spec': {'label': '展示音频规格', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_audio_spec', 'default': False},
+    'new_library_show_subtitle_spec': {'label': '展示字幕规格', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_subtitle_spec', 'default': False},
+    'new_library_show_timestamp': {'label': '展示更新时间', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_timestamp', 'default': True},
+    'new_library_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_view_on_server_button', 'default': True},
+    'status_feedback': {'label': '观看状态反馈内容设置', 'parent': 'content_settings', 'children': ['status_show_poster', 'status_show_player', 'status_show_device', 'status_show_location', 'status_show_media_detail', 'status_media_detail_has_tmdb_link', 'status_show_media_type', 'status_show_overview', 'status_show_timestamp', 'status_show_view_on_server_button', 'status_show_terminate_session_button', 'status_show_send_message_button', 'status_show_broadcast_button', 'status_show_terminate_all_button']},
+    'status_show_poster': {'label': '展示海报', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_poster', 'default': True},
+    'status_show_player': {'label': '展示播放器', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_player', 'default': True},
+    'status_show_device': {'label': '展示设备', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_device', 'default': True},
+    'status_show_location': {'label': '展示位置信息', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_location', 'default': True},
+    'status_show_media_detail': {'label': '展示节目详情', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_media_detail', 'default': True},
+    'status_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.media_detail_has_tmdb_link', 'default': True},
+    'status_show_media_type': {'label': '展示节目类型', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_media_type', 'default': True},
+    'status_show_overview': {'label': '展示剧情', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_overview', 'default': False},
+    'status_show_timestamp': {'label': '展示时间', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_timestamp', 'default': True},
+    'status_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_view_on_server_button', 'default': True},
+    'status_show_terminate_session_button': {'label': '展示“停止播放”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_session_button', 'default': True},
+    'status_show_send_message_button': {'label': '展示“发送消息”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_send_message_button', 'default': True},
+    'status_show_broadcast_button': {'label': '展示“群发消息”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_broadcast_button', 'default': True},
+    'status_show_terminate_all_button': {'label': '展示“停止所有”按钮', 'parent': 'status_feedback', 'config_path': 'settings.content_settings.status_feedback.show_terminate_all_button', 'default': True},
+    'playback_action': {'label': '播放行为推送内容设置', 'parent': 'content_settings', 'children': ['playback_show_poster', 'playback_show_media_detail', 'playback_media_detail_has_tmdb_link', 'playback_show_user', 'playback_show_player', 'playback_show_device', 'playback_show_location', 'playback_show_progress', 'playback_show_video_spec', 'playback_show_audio_spec', 'playback_show_subtitle_spec', 'playback_show_media_type', 'playback_show_overview', 'playback_show_timestamp', 'playback_show_view_on_server_button']},
+    'playback_show_poster': {'label': '展示海报', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_poster', 'default': True},
+    'playback_show_media_detail': {'label': '展示节目详情', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_media_detail', 'default': True},
+    'playback_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.media_detail_has_tmdb_link', 'default': True},
+    'playback_show_user': {'label': '展示用户名', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_user', 'default': True},
+    'playback_show_player': {'label': '展示播放器', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_player', 'default': True},
+    'playback_show_device': {'label': '展示设备', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_device', 'default': True},
+    'playback_show_location': {'label': '展示位置信息', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_location', 'default': True},
+    'playback_show_progress': {'label': '展示播放进度', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_progress', 'default': True},
+    'playback_show_video_spec': {'label': '展示视频规格', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_video_spec', 'default': False},
+    'playback_show_audio_spec': {'label': '展示音频规格', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_audio_spec', 'default': False},
+    'playback_show_subtitle_spec': {'label': '展示字幕规格', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_subtitle_spec', 'default': False},
+    'playback_show_media_type': {'label': '展示节目类型', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_media_type', 'default': True},
+    'playback_show_overview': {'label': '展示剧情', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_overview', 'default': True},
+    'playback_show_timestamp': {'label': '展示时间', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_timestamp', 'default': True},
+    'playback_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'playback_action', 'config_path': 'settings.content_settings.playback_action.show_view_on_server_button', 'default': True},
+    'library_deleted_content': {'label': '删除节目通知内容设置', 'parent': 'content_settings', 'children': ['deleted_show_poster', 'deleted_show_media_detail', 'deleted_media_detail_has_tmdb_link', 'deleted_show_overview', 'deleted_show_media_type', 'deleted_show_timestamp']},
+    'deleted_show_poster': {'label': '展示海报', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_poster', 'default': True},
+    'deleted_show_media_detail': {'label': '展示节目详情', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_media_detail', 'default': True},
+    'deleted_media_detail_has_tmdb_link': {'label': '节目详情添加TMDB链接', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.media_detail_has_tmdb_link', 'default': True},
+    'deleted_show_overview': {'label': '展示剧情', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_overview', 'default': True},
+    'deleted_show_media_type': {'label': '展示节目类型', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_media_type', 'default': True},
+    'deleted_show_timestamp': {'label': '展示删除时间', 'parent': 'library_deleted_content', 'config_path': 'settings.content_settings.library_deleted_notification.show_timestamp', 'default': True},
+    'search_display': {'label': '搜索结果展示内容设置', 'parent': 'content_settings', 'children': ['search_show_media_type_in_list', 'search_movie', 'search_series']},
+    'search_show_media_type_in_list': {'label': '搜索结果列表展示节目分类', 'parent': 'search_display', 'config_path': 'settings.content_settings.search_display.show_media_type_in_list', 'default': True},
+    'search_movie': {'label': '电影展示设置', 'parent': 'search_display', 'children': ['movie_show_poster', 'movie_title_has_tmdb_link', 'movie_show_type', 'movie_show_category', 'movie_show_overview', 'movie_show_video_spec', 'movie_show_audio_spec', 'movie_show_subtitle_spec', 'movie_show_added_time', 'movie_show_view_on_server_button']},
+    'search_series': {'label': '剧集展示设置', 'parent': 'search_display', 'children': ['series_show_poster', 'series_title_has_tmdb_link', 'series_show_type', 'series_show_category', 'series_show_overview', 'series_season_specs', 'series_update_progress', 'series_show_view_on_server_button']},
+    'movie_show_poster': {'label': '展示海报', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_poster', 'default': True},
+    'movie_title_has_tmdb_link': {'label': '电影名称添加TMDB链接', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.title_has_tmdb_link', 'default': True},
+    'movie_show_type': {'label': '展示类型', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_type', 'default': True},
+    'movie_show_category': {'label': '展示分类', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_category', 'default': True},
+    'movie_show_overview': {'label': '展示剧情', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_overview', 'default': True},
+    'movie_show_video_spec': {'label': '展示视频规格', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_video_spec', 'default': True},
+    'movie_show_audio_spec': {'label': '展示音频规格', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_audio_spec', 'default': True},
+    'movie_show_subtitle_spec': {'label': '展示字幕规格', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_subtitle_spec', 'default': True},
+    'movie_show_added_time': {'label': '展示入库时间', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_added_time', 'default': True},
+    'movie_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'search_movie', 'config_path': 'settings.content_settings.search_display.movie.show_view_on_server_button', 'default': True},
+    'series_show_poster': {'label': '展示海报', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_poster', 'default': True},
+    'series_title_has_tmdb_link': {'label': '剧目名称添加TMDB链接', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.title_has_tmdb_link', 'default': True},
+    'series_show_type': {'label': '展示类型', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_type', 'default': True},
+    'series_show_category': {'label': '展示分类', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_category', 'default': True},
+    'series_show_overview': {'label': '展示剧情', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_overview', 'default': True},
+    'series_show_view_on_server_button': {'label': '展示“在服务器中查看按钮”', 'parent': 'search_series', 'config_path': 'settings.content_settings.search_display.series.show_view_on_server_button', 'default': True},
+    'series_season_specs': {'label': '各季规格', 'parent': 'search_series', 'children': ['series_season_show_video_spec', 'series_season_show_audio_spec', 'series_season_show_subtitle_spec']},
+    'series_season_show_video_spec': {'label': '展示各季视频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_video_spec', 'default': True},
+    'series_season_show_audio_spec': {'label': '展示各季音频规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_audio_spec', 'default': True},
+    'series_season_show_subtitle_spec': {'label': '展示各季字幕规格', 'parent': 'series_season_specs', 'config_path': 'settings.content_settings.search_display.series.season_specs.show_subtitle_spec', 'default': True},
+    'series_update_progress': {'label': '更新进度', 'parent': 'search_series', 'children': ['series_progress_show_latest_episode', 'series_progress_latest_episode_has_tmdb_link', 'series_progress_show_overview', 'series_progress_show_added_time', 'series_progress_show_progress_status']},
+    'series_progress_show_latest_episode': {'label': '展示已更新至', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_latest_episode', 'default': True},
+    'series_progress_latest_episode_has_tmdb_link': {'label': '已更新至添加TMDB链接', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.latest_episode_has_tmdb_link', 'default': True},
+    'series_progress_show_overview': {'label': '展示剧情', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_overview', 'default': False},
+    'series_progress_show_added_time': {'label': '展示入库时间', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_added_time', 'default': True},
+    'series_progress_show_progress_status': {'label': '展示更新进度', 'parent': 'series_update_progress', 'config_path': 'settings.content_settings.search_display.series.update_progress.show_progress_status', 'default': True},
+    'notification_management': {'label': '通知消息管理', 'parent': 'root', 'children': ['notify_library_events', 'notify_playback_events', 'notification_management_advanced']},
+    'notify_library_events': {'label': '新增/删除节目通知消息', 'parent': 'notification_management', 'children': ['notify_library_new', 'notify_library_deleted']},
+    'notify_library_new': {'label': '新增节目通知消息', 'parent': 'notify_library_events', 'children': ['new_to_group', 'new_to_channel', 'new_to_private']},
+    'notify_library_deleted': {'label': '删除节目通知消息', 'parent': 'notify_library_events', 'config_path': 'settings.notification_management.library_deleted', 'default': True},
+    'notify_playback_events': {'label': '播放行为通知消息', 'parent': 'notification_management', 'children': ['notify_playback_start', 'notify_playback_pause', 'notify_playback_stop']},
+    'notify_playback_start': {'label': '开始/继续播放通知消息', 'parent': 'notify_playback_events', 'config_path': 'settings.notification_management.playback_start', 'default': True},
+    'notify_playback_pause': {'label': '暂停播放通知消息', 'parent': 'notify_playback_events', 'config_path': 'settings.notification_management.playback_pause', 'default': False},
+    'notify_playback_stop': {'label': '停止播放通知消息', 'parent': 'notify_playback_events', 'config_path': 'settings.notification_management.playback_stop', 'default': True},
+    'new_to_group': {'label': '发送到群组', 'parent': 'notify_library_new', 'config_path': 'settings.notification_management.library_new.to_group', 'default': True},
+    'new_to_channel': {'label': '发送到频道', 'parent': 'notify_library_new', 'config_path': 'settings.notification_management.library_new.to_channel', 'default': True},
+    'new_to_private': {'label': '发送给管理员', 'parent': 'notify_library_new', 'config_path': 'settings.notification_management.library_new.to_private', 'default': False},
+    'notification_management_advanced': {'label': '高级通知管理', 'parent': 'notification_management', 'children': ['notify_user_login_success', 'notify_user_login_failure', 'notify_user_creation_deletion', 'notify_user_updates', 'notify_server_restart_required']},
+    'notify_user_login_success': {'label': '用户登录成功', 'parent': 'notification_management_advanced', 'config_path': 'settings.notification_management.advanced.user_login_success', 'default': True},
+    'notify_user_login_failure': {'label': '用户登录失败', 'parent': 'notification_management_advanced', 'config_path': 'settings.notification_management.advanced.user_login_failure', 'default': True},
+    'notify_user_creation_deletion': {'label': '用户创建/删除', 'parent': 'notification_management_advanced', 'config_path': 'settings.notification_management.advanced.user_creation_deletion', 'default': True},
+    'notify_user_updates': {'label': '用户策略/密码更新', 'parent': 'notification_management_advanced', 'config_path': 'settings.notification_management.advanced.user_updates', 'default': True},
+    'notify_server_restart_required': {'label': '服务器需要重启', 'parent': 'notification_management_advanced', 'config_path': 'settings.notification_management.advanced.server_restart_required', 'default': True},
+    'auto_delete_settings': {'label': '自动删除消息设置', 'parent': 'root', 'children': ['delete_library_events', 'delete_playback_status', 'delete_advanced_notifications']},    
+    'delete_library_events': {'label': '新增/删除节目通知消息', 'parent': 'auto_delete_settings', 'children': ['delete_new_library', 'delete_library_deleted']},
+    'delete_new_library': {'label': '新增节目通知消息', 'parent': 'delete_library_events', 'children': ['delete_new_library_group', 'delete_new_library_channel', 'delete_new_library_private']},
+    'delete_library_deleted': {'label': '删除节目通知消息', 'parent': 'delete_library_events', 'config_path': 'settings.auto_delete_settings.library_deleted', 'default': True},
+    'delete_new_library_group': {'label': '自动删除发送到群组的消息', 'parent': 'delete_new_library', 'config_path': 'settings.auto_delete_settings.new_library.to_group', 'default': False},
+    'delete_new_library_channel': {'label': '自动删除发送到频道的消息', 'parent': 'delete_new_library', 'config_path': 'settings.auto_delete_settings.new_library.to_channel', 'default': False},
+    'delete_new_library_private': {'label': '自动删除发送给管理员的消息', 'parent': 'delete_new_library', 'config_path': 'settings.auto_delete_settings.new_library.to_private', 'default': True},
+    'delete_playback_status': {'label': '播放行为通知消息', 'parent': 'auto_delete_settings', 'children': ['delete_playback_start', 'delete_playback_pause', 'delete_playback_stop']},
+    'delete_playback_start': {'label': '开始/继续播放通知消息', 'parent': 'delete_playback_status', 'config_path': 'settings.auto_delete_settings.playback_start', 'default': True},
+    'delete_playback_pause': {'label': '暂停播放通知消息', 'parent': 'delete_playback_status', 'config_path': 'settings.auto_delete_settings.playback_pause', 'default': True},
+    'delete_playback_stop': {'label': '停止播放通知消息', 'parent': 'delete_playback_status', 'config_path': 'settings.auto_delete_settings.playback_stop', 'default': True},
+    'delete_advanced_notifications': {'label': '高级通知消息', 'parent': 'auto_delete_settings', 'children': ['delete_user_login', 'delete_user_management', 'delete_server_events']}, 
+    'delete_user_login': {'label': '用户登录成功/失败', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.user_login', 'default': True}, 
+    'delete_user_management': {'label': '用户创建/删除/更新', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.user_management', 'default': True},
+    'delete_server_events': {'label': '服务器事件', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.server_events', 'default': True}, 
 }
 
 def build_toggle_maps():
@@ -462,6 +466,7 @@ def parse_episode_ranges_from_description(description: str):
         return None, []
 
     tokens = re.split(r'[，,]\s*|/\s*', first_line)
+    
     season_ctx = None
     summary_parts, expanded = [], []
 
@@ -502,6 +507,104 @@ def escape_markdown(text: str) -> str:
     text = str(text)
     escape_chars = r'\_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
+
+def format_date(date_in):
+    """
+    将 Emby/TMDB/Telegram 常见时间转换为本地时区字符串 'YYYY-MM-DD HH:MM:SS'。
+    支持输入：
+      - ISO8601 字符串（可带 'Z'，可带任意位小数）
+      - datetime.datetime 对象（naive 或 aware）
+    若解析失败，返回 '未知'。
+    """
+    try:
+        try:
+            target_tz = TIMEZONE
+        except NameError:
+            try:
+                from zoneinfo import ZoneInfo
+                target_tz = ZoneInfo(get_setting('settings.timezone') or 'UTC')
+            except Exception:
+                from zoneinfo import ZoneInfo
+                target_tz = ZoneInfo('UTC')
+
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        if isinstance(date_in, datetime):
+            dt = date_in
+        else:
+            s = (str(date_in) or "").strip()
+            if not s:
+                return "未知"
+
+            has_z = s.endswith(('Z', 'z'))
+            if has_z:
+                s = s[:-1]
+
+            if '.' in s:
+                main, frac = s.split('.', 1)
+                frac_digits = ''.join(ch for ch in frac if ch.isdigit())
+                frac6 = (frac_digits + '000000')[:6]
+                s = f"{main}.{frac6}"
+
+            dt = datetime.fromisoformat(s)
+
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+
+        return dt.astimezone(target_tz).strftime('%Y-%m-%d %H:%M:%S')
+
+    except Exception:
+        return "未知"
+
+try:
+    globals()['format_date'] = format_date
+except Exception:
+    pass
+
+def get_event_time_str(payload: dict) -> str:
+    """
+    从 Emby Webhook payload 中提取时间并格式化为本地时区的 'YYYY-MM-DD HH:MM:SS'。
+    规则：
+      1) 优先使用 payload['Date']（UTC ISO8601），交给 format_date() 做时区转换；
+      2) 若没有 'Date'，再尝试解析 Description 第一行里的中文/英文时间；
+      3) 全部失败返回 '未知'。
+    """
+    try:
+        s = (payload or {}).get("Date")
+        if s:
+            return format_date(s)
+    except Exception:
+        pass
+
+    try:
+        import re
+        from datetime import datetime
+
+        desc = ((payload or {}).get("Description") or "").splitlines()[0].strip()
+        if desc:
+            m = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日.*?(上午|下午)?\s*(\d{1,2}):(\d{2})', desc)
+            if m:
+                y, mo, d, ampm, hh, mm = m.groups()
+                hh = int(hh); mm = int(mm)
+                if ampm in ('下午', 'PM', 'pm') and hh < 12:
+                    hh += 12
+                if ampm in ('上午', 'AM', 'am') and hh == 12:
+                    hh = 0
+                dt = datetime(int(y), int(mo), int(d), hh, mm, tzinfo=TIMEZONE)
+                return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+            cleaned = re.sub(r'^[A-Za-z]+,\s*', '', desc)
+            for fmt in ("%B %d, %Y %I:%M %p", "%b %d, %Y %I:%M %p", "%B %d %Y %I:%M %p"):
+                try:
+                    dt = datetime.strptime(cleaned, fmt).replace(tzinfo=TIMEZONE)
+                    return dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return "未知"
 
 def format_ticks_to_hms(ticks):
     """将Emby的ticks时间格式化为HH:MM:SS。"""
@@ -817,6 +920,35 @@ def get_ip_geolocation(ip):
             print(f"❌ 解析百度 API 响应时发生错误。IP: {ip}, 错误: {e}")
     
     return "未知位置"
+
+def get_all_emby_users():
+    """从Emby获取所有用户列表，并使用1分钟缓存。"""
+    now = time.time()
+    
+    if 'users' in EMBY_USERS_CACHE and (now - EMBY_USERS_CACHE.get('timestamp', 0) < 60):
+        print("ℹ️ 从缓存中获取Emby用户列表。")
+        return EMBY_USERS_CACHE['users']
+
+    print("🔑 正在从Emby API获取完整用户列表...")
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY]):
+        print("❌ 缺少获取用户列表所需的Emby服务器配置。")
+        return set()
+
+    url = f"{EMBY_SERVER_URL}/Users"
+    params = {'api_key': EMBY_API_KEY}
+    response = make_request_with_retry('GET', url, params=params, timeout=10)
+    
+    if response:
+        users_data = response.json()
+        user_names = {user['Name'] for user in users_data if 'Name' in user}
+        
+        EMBY_USERS_CACHE['users'] = user_names
+        EMBY_USERS_CACHE['timestamp'] = now
+        print(f"✅ 成功获取并缓存了 {len(user_names)} 个用户名。")
+        return user_names
+    else:
+        print("❌ 获取Emby用户列表失败。")
+        return set()
 
 def search_tmdb_multi(title, year=None):
     """
@@ -1390,6 +1522,59 @@ def get_series_season_media_info(series_id):
         season_info_lines.append(season_line)
     return season_info_lines if season_info_lines else ["未找到剧集规格信息"]
 
+def get_episode_item_by_number(series_id, season_number, episode_number):
+    """根据季号和集号获取剧集项目的Emby Item对象。"""
+    print(f"ℹ️ 正在精确查询剧集 {series_id} 的 S{season_number:02d}E{episode_number:02d} 的项目信息。")
+    request_user_id = EMBY_USER_ID
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY, series_id, request_user_id]):
+        return None
+
+    api_endpoint = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items"
+    params = {
+        'api_key': EMBY_API_KEY,
+        'ParentId': series_id,
+        'IncludeItemTypes': 'Episode',
+        'Recursive': 'true',
+        'Fields': 'Id,ParentIndexNumber,IndexNumber',
+        'ParentIndexNumber': season_number,
+        'IndexNumber': episode_number
+    }
+    response = make_request_with_retry('GET', api_endpoint, params=params, timeout=15)
+    
+    if response and response.json().get('Items'):
+        episode_item = response.json()['Items'][0]
+        print(f"✅ 精确匹配成功，项目 ID: {episode_item.get('Id')}")
+        return episode_item
+    else:
+        print(f"❌ Emby API 未能找到 S{season_number:02d}E{episode_number:02d}。")
+        return None
+
+def get_any_episode_from_season(series_id, season_number):
+    """获取指定季中任意一集的信息，用于规格参考。"""
+    print(f"ℹ️ 正在查找第 {season_number} 季中的任意一集作为规格参考...")
+    request_user_id = EMBY_USER_ID
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY, series_id, request_user_id]): return None
+
+    api_endpoint = f"{EMBY_SERVER_URL}/Users/{request_user_id}/Items"
+    params = {
+        'api_key': EMBY_API_KEY,
+        'ParentId': series_id,
+        'IncludeItemTypes': 'Episode',
+        'Recursive': 'true',
+        'Fields': 'Id,ParentIndexNumber',
+        'ParentIndexNumber': season_number,
+        'Limit': 1
+    }
+    response = make_request_with_retry('GET', api_endpoint, params=params, timeout=15)
+    
+    if response and response.json().get('Items'):
+        episode_item = response.json()['Items'][0]
+        print(f"✅ 找到第 {season_number} 季的参考集，ID: {episode_item.get('Id')}")
+        return episode_item
+    else:
+        print(f"❌ 未能在第 {season_number} 季中找到任何剧集。")
+        return None
+
 def _get_latest_episode_info(series_id):
     """获取指定剧集系列的最新一集信息。"""
     print(f"ℹ️ 正在获取剧集 {series_id} 的最新剧集信息。")
@@ -1745,7 +1930,7 @@ def build_progress_lines_for_library_new(item, media_details):
         return []
 
 def get_media_stream_details(item_id, user_id=None):
-    """获取指定项目的媒体流信息（视频、音频）。"""
+    """获取指定项目的媒体流信息（视频、音频、字幕）。"""
     print(f"ℹ️ 正在获取项目 {item_id} 的媒体流信息。")
     request_user_id = user_id or EMBY_USER_ID
     if not all([EMBY_SERVER_URL, EMBY_API_KEY, request_user_id]): return None
@@ -1760,12 +1945,12 @@ def get_media_stream_details(item_id, user_id=None):
     if not media_sources: return None
     print(f"✅ 获取到项目 {item_id} 的媒体流信息。")
 
-    video_info, audio_info_list = {}, []
+    video_info, audio_info_list, subtitle_info_list = {}, [], []
     for stream in media_sources[0].get('MediaStreams', []):
         if stream.get('Type') == 'Video' and not video_info:
             bitrate_mbps = stream.get('BitRate', 0) / 1_000_000
             video_info = {
-                'title': stream.get('Title') or stream.get('Codec', '未知').upper(),
+                'title': stream.get('Codec', '未知').upper(),
                 'resolution': f"{stream.get('Width', 0)}x{stream.get('Height', 0)}",
                 'bitrate': f"{bitrate_mbps:.1f}" if bitrate_mbps > 0 else "未知",
                 'video_range': stream.get('VideoRange', '')
@@ -1775,7 +1960,13 @@ def get_media_stream_details(item_id, user_id=None):
                 'language': stream.get('Language', '未知'), 'codec': stream.get('Codec', '未知'),
                 'layout': stream.get('ChannelLayout', '')
             })
-    return {'video_info': video_info, 'audio_info': audio_info_list} if video_info or audio_info_list else None
+        elif stream.get('Type') == 'Subtitle':
+            subtitle_info_list.append({
+                'language': stream.get('Language', '未知'),
+                'codec': stream.get('Codec', '未知').upper()
+            })
+            
+    return {'video_info': video_info, 'audio_info': audio_info_list, 'subtitle_info': subtitle_info_list} if video_info or audio_info_list or subtitle_info_list else None
 
 def format_stream_details_message(stream_details, is_season_info=False, prefix='movie'):
     """格式化媒体流详细信息为消息文本。"""
@@ -1835,6 +2026,35 @@ def format_stream_details_message(stream_details, is_season_info=False, prefix='
             label = "音频规格：" if prefix == 'new_library_notification' or prefix == 'playback_action' else "音频："
             indent = "    " if is_season_info else ""
             message_parts.append(f"{indent}{label}{full_audio_str}")
+            
+    subtitle_setting_path_map = {
+        'movie': 'settings.content_settings.search_display.movie.show_subtitle_spec',
+        'series': 'settings.content_settings.search_display.series.season_specs.show_subtitle_spec',
+        'new_library_notification': 'settings.content_settings.new_library_notification.show_subtitle_spec',
+        'playback_action': 'settings.content_settings.playback_action.show_subtitle_spec'
+    }
+    subtitle_setting_path = subtitle_setting_path_map.get(prefix)
+
+    subtitle_info_list = stream_details.get('subtitle_info')
+    if subtitle_info_list and get_setting(subtitle_setting_path):
+        subtitle_lines = []
+        seen_tracks = set()
+        for s_info in subtitle_info_list:
+            lang_code = s_info.get('language', 'und').lower()
+            lang_display = LANG_MAP.get(lang_code, {}).get('zh', lang_code.capitalize())
+            
+            sub_parts = [p for p in [lang_display if lang_display != '未知' else None, s_info.get('codec')] if p]
+            if sub_parts:
+                track_str = ' '.join(sub_parts)
+                if track_str not in seen_tracks:
+                    subtitle_lines.append(track_str)
+                    seen_tracks.add(track_str)
+
+        if subtitle_lines:
+            full_subtitle_str = "、".join(subtitle_lines)
+            label = "字幕规格：" if prefix == 'new_library_notification' or prefix == 'playback_action' else "字幕："
+            indent = "    " if is_season_info else ""
+            message_parts.append(f"{indent}{label}{full_subtitle_str}")
             
     return message_parts
 
@@ -2127,23 +2347,6 @@ def send_search_detail(chat_id, search_id, item_index, user_id):
         overview_text = raw_overview[:150] + "..." if len(raw_overview) > 150 else raw_overview
         message_parts.append(f"剧情：{escape_markdown(overview_text)}")
 
-    def format_date(date_str):
-        """格式化日期字符串。"""
-        if not date_str: return "未知"
-        try:
-            date_str = date_str.rstrip('Z')
-            if '.' in date_str:
-                main_part, fractional_part = date_str.split('.', 1)
-                fractional_part = fractional_part[:6]
-                date_to_parse = f"{main_part}.{fractional_part}"
-            else:
-                date_to_parse = date_str
-            dt_naive = datetime.fromisoformat(date_to_parse)
-            dt_utc = dt_naive.replace(tzinfo=ZoneInfo("UTC"))
-            return dt_utc.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')
-        except (ValueError, TypeError):
-            return "未知"
-
     if item_type == 'Movie':
         stream_details = get_media_stream_details(item_id, request_user_id)
         formatted_parts = format_stream_details_message(stream_details, prefix='movie')
@@ -2207,9 +2410,25 @@ def send_settings_menu(chat_id, user_id, message_id=None, menu_key='root'):
     """
     print(f"⚙️ 正在向用户 {user_id} 发送设置菜单，菜单键: {menu_key}")
     node = SETTINGS_MENU_STRUCTURE.get(menu_key, SETTINGS_MENU_STRUCTURE['root'])
-    text_parts = [f"*{escape_markdown(node['label'])}*"]
+
+    def get_breadcrumb_path(key):
+        path_parts = []
+        current_key = key
+        while current_key is not None:
+            current_node = SETTINGS_MENU_STRUCTURE.get(current_key)
+            if current_node:
+                path_parts.append(current_node['label'])
+                current_key = current_node.get('parent')
+            else:
+                break
+        return " >> ".join(reversed(path_parts))
+
+    breadcrumb_title = get_breadcrumb_path(menu_key)
+    text_parts = [f"*{escape_markdown(breadcrumb_title)}*"]
+    
     if menu_key == 'root':
-        text_parts.append("管理机器人的各项功能与通知")
+        text_parts.append("管理机器人的各项功能与通知！")
+        
     buttons = []
     if 'children' in node:
         for child_key in node['children']:
@@ -2223,11 +2442,13 @@ def send_settings_menu(chat_id, user_id, message_id=None, menu_key='root'):
                 if item_index is not None:
                     callback_data = f"t_{item_index}_{user_id}"
                     buttons.append([{'text': f"{status_icon} {child_node['label']}", 'callback_data': callback_data}])
+    
     nav_buttons = []
     if 'parent' in node and node['parent'] is not None:
         nav_buttons.append({'text': '◀️ 返回上一级', 'callback_data': f'n_{node["parent"]}_{user_id}'})
     nav_buttons.append({'text': '☑️ 完成', 'callback_data': f'c_menu_{user_id}'})
     buttons.append(nav_buttons)
+    
     message_text = "\n".join(text_parts)
     if message_id:
         edit_telegram_message(chat_id, message_id, message_text, inline_buttons=buttons)
@@ -3401,23 +3622,6 @@ def send_manage_detail(chat_id, search_id, item_index, user_id):
         overview_text = raw_overview[:150] + "..." if len(raw_overview) > 150 else raw_overview
         message_parts.append(f"剧情：{escape_markdown(overview_text)}")
 
-    def format_date(date_str):
-        """格式化日期字符串。"""
-        if not date_str: return "未知"
-        try:
-            date_str = date_str.rstrip('Z')
-            if '.' in date_str:
-                main_part, fractional_part = date_str.split('.', 1)
-                fractional_part = fractional_part[:6]
-                date_to_parse = f"{main_part}.{fractional_part}"
-            else:
-                date_to_parse = date_str
-            dt_naive = datetime.fromisoformat(date_to_parse)
-            dt_utc = dt_naive.replace(tzinfo=ZoneInfo("UTC"))
-            return dt_utc.astimezone(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')
-        except (ValueError, TypeError):
-            return "未知"
-
     if item_type == 'Movie':
         stream_details = get_media_stream_details(item_id, request_user_id)
         formatted_parts = format_stream_details_message(stream_details, prefix='movie')
@@ -3545,14 +3749,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 json_string = parsed_form.get('data', [None])[0]
             else:
                 print(f"❌ 不支持的 Content-Type: {content_type}")
-                self.send_response(400)
-                self.end_headers()
+                self.send_response(400); self.end_headers()
                 return
 
             if not json_string:
                 print("❌ Webhook 请求中没有数据。")
-                self.send_response(400)
-                self.end_headers()
+                self.send_response(400); self.end_headers()
                 return
 
             event_data = json.loads(unquote(json_string))
@@ -3566,8 +3768,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             session = event_data.get('Session', {}) or {}
             playback_info = event_data.get('PlaybackInfo', {}) or {}
             print(f"ℹ️ 检测到 Emby 事件: {event_type}")
-
-            # ============ 新增节目通知 ============
+            
             if event_type == "library.new":
                 if not any([
                     get_setting('settings.notification_management.library_new.to_group'),
@@ -3584,7 +3785,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 if item.get('Id') and EMBY_USER_ID:
                     print(f"ℹ️ 正在使用 Emby API 补充项目 {item.get('Id')} 的元数据。")
                     full_item_url = f"{EMBY_SERVER_URL}/Users/{EMBY_USER_ID}/Items/{item.get('Id')}"
-                    params = {'api_key': EMBY_API_KEY, 'Fields': 'ProviderIds,Path,Overview,ProductionYear,ServerId,DateCreated,SeriesProviderIds'}
+                    params = {'api_key': EMBY_API_KEY, 'Fields': 'ProviderIds,Path,Overview,ProductionYear,ServerId,DateCreated,SeriesProviderIds,ParentIndexNumber,SeriesId'}
                     response = make_request_with_retry('GET', full_item_url, params=params, timeout=10)
                     if response:
                         item = response.json()
@@ -3593,20 +3794,73 @@ class WebhookHandler(BaseHTTPRequestHandler):
                         print("❌ 补充元数据失败，将使用 Webhook 原始数据。")
 
                 media_details = get_media_details(item, event_data.get('User', {}).get('Id'))
-
                 added_summary, added_list = parse_episode_ranges_from_description(event_data.get('Description', ''))
 
                 if item.get('Type') == 'Series':
-                    latest_episode = _get_latest_episode_info(item.get('Id'))
-                    if latest_episode:
-                        stream_details = get_media_stream_details(latest_episode.get('Id'), EMBY_USER_ID)
+                    def sxxeyy_key(s_str):
+                        match = re.match(r'S(\d+)E(\d+)', s_str, re.IGNORECASE)
+                        if match:
+                            return int(match.group(1)), int(match.group(2))
+                        return 0, 0
+
+                    if added_list:
+                        print("🔍 规格查找策略 1: 检查本次新增的剧集...")
+                        sorted_added_list = sorted(added_list, key=sxxeyy_key)
+                        for ep_str in sorted_added_list:
+                            s_num, e_num = sxxeyy_key(ep_str)
+                            if s_num > 0 and e_num > 0:
+                                episode_item = get_episode_item_by_number(item.get('Id'), s_num, e_num)
+                                if episode_item:
+                                    temp_details = get_media_stream_details(episode_item.get('Id'), EMBY_USER_ID)
+                                    if temp_details:
+                                        print(f"✅ 规格查找成功 (策略 1): 使用 {ep_str} 的规格。")
+                                        stream_details = temp_details
+                                        break
+                    
+                    if not stream_details and added_list:
+                        print("🔍 规格查找策略 2: 检查同季的其他剧集...")
+                        involved_seasons = sorted(list(set(sxxeyy_key(s)[0] for s in added_list if sxxeyy_key(s)[0] > 0)))
+                        for s_num in involved_seasons:
+                            episode_item = get_any_episode_from_season(item.get('Id'), s_num)
+                            if episode_item:
+                                temp_details = get_media_stream_details(episode_item.get('Id'), EMBY_USER_ID)
+                                if temp_details:
+                                    print(f"✅ 规格查找成功 (策略 2): 使用 S{s_num:02d} 中参考集 (ID: {episode_item.get('Id')}) 的规格。")
+                                    stream_details = temp_details
+                                    break
+                    
+                    if not stream_details:
+                        print("🔍 规格查找策略 3: 回退至获取媒体库最新一集。")
+                        episode_item = _get_latest_episode_info(item.get('Id'))
+                        if episode_item:
+                            stream_details = get_media_stream_details(episode_item.get('Id'), EMBY_USER_ID)
+                            if stream_details:
+                                s_num = episode_item.get('ParentIndexNumber', 0)
+                                e_num = episode_item.get('IndexNumber', 0)
+                                print(f"✅ 规格查找成功 (策略 3): 使用了媒体库最新集 S{s_num:02d}E{e_num:02d} (ID: {episode_item.get('Id')}) 的规格。")
                 else:
-                    print("ℹ️ 新增项目为电影/其他，准备延时以等待Emby分析媒体源...")
+                    print("ℹ️ 新增项目为电影/其他类型，准备延时以等待Emby分析媒体源...")
                     time.sleep(30)
+                    print(f"🔍 规格查找策略 1: 尝试获取项目 {item.get('Name')} (ID: {item.get('Id')}) 的精确规格...")
                     stream_details = get_media_stream_details(item.get('Id'), None)
+                    if stream_details:
+                        print(f"✅ 规格查找成功 (策略 1): 成功获取项目 {item.get('Name')} (ID: {item.get('Id')}) 的规格。")
+
+                if not stream_details and item.get('Type') == 'Episode':
+                    season_num = item.get('ParentIndexNumber')
+                    series_id = item.get('SeriesId')
+                    if season_num is not None and series_id:
+                        print(f"🔍 规格查找策略 2: 策略1失败，尝试查找 S{season_num:02d} 中其他剧集的规格作为参考...")
+                        ref_episode_item = get_any_episode_from_season(series_id, season_num)
+                        if ref_episode_item:
+                            stream_details = get_media_stream_details(ref_episode_item.get('Id'), EMBY_USER_ID)
+                            if stream_details:
+                                print(f"✅ 规格查找成功 (策略 2): 使用了同季参考集 (ID: {ref_episode_item.get('Id')}) 的规格。")
+
+                if not stream_details:
+                    print("❌ 所有规格查找策略均失败，将发送不含规格的通知。")
 
                 parts = []
-
                 raw_episode_info = ""
                 if item.get('Type') == 'Episode':
                     s, e, en = item.get('ParentIndexNumber'), item.get('IndexNumber'), item.get('Name')
@@ -3619,7 +3873,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
                 title_with_year_and_episode = f"{raw_title} ({media_details.get('year')})" if media_details.get('year') else raw_title
                 title_with_year_and_episode += raw_episode_info
-
                 action_text = "✅ 新增"
                 item_type_cn = "剧集" if item.get('Type') in ['Episode', 'Series', 'Season'] else "电影" if item.get('Type') == 'Movie' else ""
 
@@ -3662,7 +3915,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     parts.append(f"入库时间：{escape_markdown(datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S'))}")
 
                 message = "\n".join(parts)
-
                 photo_url = None
                 if get_setting('settings.content_settings.new_library_notification.show_poster'):
                     photo_url = media_details.get('poster_url')
@@ -3742,7 +3994,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
                 title_full = f"{display_title} ({year})" if year else display_title
                 title_full += episode_info
-
                 parts = []
                 action_text = "🗑️ 删除"
                 item_type_cn = "剧集" if item_type in ['Series', 'Season', 'Episode'] else "电影"
@@ -3784,11 +4035,117 @@ class WebhookHandler(BaseHTTPRequestHandler):
                         send_telegram_notification(message, photo_url, chat_id=ADMIN_USER_ID)
                 else:
                     print("⚠️ 删除通知跳过：未配置 ADMIN_USER_ID。")
-
                 self.send_response(200); self.end_headers()
                 return
 
-            # ========= 播放相关（开始 / 继续 / 暂停 / 停止）=========
+            user_and_system_events = [
+                "user.authenticated", "user.authenticationfailed", "user.created",
+                "user.policyupdated", "user.passwordchanged", "user.deleted",
+                "system.serverrestartrequired"
+            ]
+
+            if event_type in user_and_system_events:
+                config_map = {
+                    "user.authenticated": 'settings.notification_management.advanced.user_login_success',
+                    "user.authenticationfailed": 'settings.notification_management.advanced.user_login_failure',
+                    "user.created": 'settings.notification_management.advanced.user_creation_deletion',
+                    "user.deleted": 'settings.notification_management.advanced.user_creation_deletion',
+                    "user.policyupdated": 'settings.notification_management.advanced.user_updates',
+                    "user.passwordchanged": 'settings.notification_management.advanced.user_updates',
+                    "system.serverrestartrequired": 'settings.notification_management.advanced.server_restart_required',
+                }
+                
+                config_path = config_map.get(event_type)
+                if not config_path or not get_setting(config_path):
+                    print(f"⚠️ 已关闭 {event_type} 事件通知，跳过。")
+                    self.send_response(204); self.end_headers(); return
+
+                if not ADMIN_USER_ID:
+                    print(f"⚠️ 未配置 ADMIN_USER_ID，无法发送用户/系统事件通知。")
+                    self.send_response(204); self.end_headers(); return
+                
+                time_str = get_event_time_str(event_data)
+                parts = []
+                icon = "ℹ️"
+                custom_title = ""
+
+                username = user.get('Name')
+                if event_type == "user.authenticated":
+                    icon = "✅"
+                    custom_title = f"用户 {username} 已成功登录"
+                    session_info = event_data.get("Session", {})
+                    ip_address = session_info.get('RemoteEndPoint', '')
+                    location = get_ip_geolocation(ip_address)
+                    parts.append(f"客户端: {escape_markdown(session_info.get('Client'))}")
+                    parts.append(f"设备: {escape_markdown(session_info.get('DeviceName'))}")
+                    parts.append(f"位置: {escape_markdown(f'{ip_address}（{location}）')}")
+                
+                elif event_type == "user.authenticationfailed":
+                    icon = "⚠️"
+                    original_title = event_data.get("Title", "")
+                    username_match = re.search(r'(?:来自|from)\s+(.+?)\s+(?:的登录|on)', original_title)
+                    username = username_match.group(1).strip() if username_match else "未知"
+                    custom_title = f"用户 {username} 登录失败"
+                    desc_text = event_data.get("Description", "")
+                    ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', desc_text)
+                    ip_address = ip_match.group(1) if ip_match else "未知IP"
+                    location = get_ip_geolocation(ip_address)
+                    device_info = event_data.get("DeviceInfo", {})
+                    parts.append(f"客户端: {escape_markdown(device_info.get('AppName'))}")
+                    parts.append(f"设备: {escape_markdown(device_info.get('Name'))}")
+                    parts.append(f"IP地址: {escape_markdown(f'{ip_address}（{location}）')}")
+                
+                    if username != "未知":
+                        all_users = get_all_emby_users()
+                        if username in all_users:
+                            failure_reason = "失败原因：密码错误"
+                        else:
+                            failure_reason = "失败原因：用户不存在"
+                        parts.append(escape_markdown(failure_reason))
+
+                elif event_type == "user.created":
+                    icon = "➕"
+                    custom_title = f"用户 {username} 已成功创建"
+                elif event_type == "user.deleted":
+                    icon = "➖"
+                    custom_title = f"用户 {username} 已删除"
+                elif event_type == "user.policyupdated":
+                    icon = "🔧"
+                    custom_title = f"用户 {username} 的策略已更新"
+                elif event_type == "user.passwordchanged":
+                    icon = "🔧"
+                    custom_title = f"用户 {username} 的密码已修改"
+                elif event_type == "system.serverrestartrequired":
+                    icon = "🔄"
+                    custom_title = "服务器需要重启"
+                    parts.append(escape_markdown(event_data.get("Title", "")))
+                
+                message_parts = [f"{icon} *{escape_markdown(custom_title)}*"]
+                message_parts.extend(parts)
+                if time_str != "未知":
+                    message_parts.append(f"时间: {escape_markdown(time_str)}")
+                    
+                message = "\n".join(message_parts)
+
+                autodelete_config_map = {
+                    "user.authenticated": 'settings.auto_delete_settings.advanced.user_login',
+                    "user.authenticationfailed": 'settings.auto_delete_settings.advanced.user_login',
+                    "user.created": 'settings.auto_delete_settings.advanced.user_management',
+                    "user.deleted": 'settings.auto_delete_settings.advanced.user_management',
+                    "user.policyupdated": 'settings.auto_delete_settings.advanced.user_management',
+                    "user.passwordchanged": 'settings.auto_delete_settings.advanced.user_management',
+                    "system.serverrestartrequired": 'settings.auto_delete_settings.advanced.server_events',
+                }
+                autodelete_path = autodelete_config_map.get(event_type)
+
+                if autodelete_path and get_setting(autodelete_path):
+                    send_deletable_telegram_notification(message, chat_id=ADMIN_USER_ID, delay_seconds=180)
+                else:
+                    send_telegram_notification(message, chat_id=ADMIN_USER_ID)
+                
+                self.send_response(200); self.end_headers()
+                return
+
             elif event_type in ["playback.start", "playback.unpause", "playback.stop", "playback.pause"]:
                 event_key_map = {
                     'playback.start': 'playback_start',
