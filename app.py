@@ -4078,7 +4078,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     location = get_ip_geolocation(ip_address)
                     parts.append(f"客户端: {escape_markdown(session_info.get('Client'))}")
                     parts.append(f"设备: {escape_markdown(session_info.get('DeviceName'))}")
-                    parts.append(f"位置: {escape_markdown(f'{ip_address}（{location}）')}")
+                    parts.append(f"位置: {escape_markdown(f'{ip_address} {location}')}")
                 
                 elif event_type == "user.authenticationfailed":
                     icon = "⚠️"
@@ -4093,7 +4093,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     device_info = event_data.get("DeviceInfo", {})
                     parts.append(f"客户端: {escape_markdown(device_info.get('AppName'))}")
                     parts.append(f"设备: {escape_markdown(device_info.get('Name'))}")
-                    parts.append(f"IP地址: {escape_markdown(f'{ip_address}（{location}）')}")
+                    parts.append(f"位置: {escape_markdown(f'{ip_address} {location}')}")
                 
                     if username != "未知":
                         all_users = get_all_emby_users()
