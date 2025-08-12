@@ -9,6 +9,7 @@ import re
 import threading
 import asyncio
 import shutil
+import base64
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, unquote
 from datetime import datetime, timedelta
@@ -43,7 +44,7 @@ EMBY_USERS_CACHE = {}   # 用于缓存Emby用户列
 
 # 设置菜单结构定义
 SETTINGS_MENU_STRUCTURE = {
-    'root': {'label': '⚙️ 主菜单', 'children': ['content_settings', 'notification_management', 'auto_delete_settings']},
+    'root': {'label': '⚙️ 主菜单', 'children': ['content_settings', 'notification_management', 'auto_delete_settings', 'system_settings']},
     'content_settings': {'label': '推送内容设置', 'parent': 'root', 'children': ['status_feedback', 'playback_action', 'library_deleted_content', 'new_library_content_settings', 'search_display']},
     'new_library_content_settings': {'label': '新增节目通知内容设置', 'parent': 'content_settings', 'children': ['new_library_show_poster', 'new_library_show_media_detail', 'new_library_media_detail_has_tmdb_link', 'new_library_show_overview', 'new_library_show_media_type', 'new_library_show_video_spec', 'new_library_show_audio_spec', 'new_library_show_subtitle_spec', 'new_library_show_progress_status', 'new_library_show_timestamp', 'new_library_show_view_on_server_button']},
     'new_library_show_progress_status': {'label': '展示更新进度/缺集', 'parent': 'new_library_content_settings', 'config_path': 'settings.content_settings.new_library_notification.show_progress_status', 'default': True},
@@ -156,7 +157,14 @@ SETTINGS_MENU_STRUCTURE = {
     'delete_advanced_notifications': {'label': '高级通知消息', 'parent': 'auto_delete_settings', 'children': ['delete_user_login', 'delete_user_management', 'delete_server_events']}, 
     'delete_user_login': {'label': '用户登录成功/失败', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.user_login', 'default': True}, 
     'delete_user_management': {'label': '用户创建/删除/更新', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.user_management', 'default': True},
-    'delete_server_events': {'label': '服务器事件', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.server_events', 'default': True}, 
+    'delete_server_events': {'label': '服务器事件', 'parent': 'delete_advanced_notifications', 'config_path': 'settings.auto_delete_settings.advanced.server_events', 'default': True},
+    'system_settings': {'label': '系统设置', 'parent': 'root', 'children': ['ip_api_selection']},
+    'ip_api_selection': {'label': 'IP地理位置API设置', 'parent': 'system_settings', 'children': ['api_baidu', 'api_ip138', 'api_pconline', 'api_vore', 'api_ipapi']},
+    'api_baidu': {'label': '百度 API', 'parent': 'ip_api_selection', 'config_value': 'baidu'},
+    'api_ip138': {'label': 'IP138 API (需配置Token)', 'parent': 'ip_api_selection', 'config_value': 'ip138'},
+    'api_pconline': {'label': '太平洋电脑 API', 'parent': 'ip_api_selection', 'config_value': 'pconline'},
+    'api_vore': {'label': 'Vore API', 'parent': 'ip_api_selection', 'config_value': 'vore'},
+    'api_ipapi': {'label': 'IP-API.com', 'parent': 'ip_api_selection', 'config_value': 'ipapi'}
 }
 
 def build_toggle_maps():
@@ -725,6 +733,77 @@ def get_emby_access_token():
         print(f"❌ 获取 Access Token 时发生网络错误: {e}")
         return None
 
+def scan_emby_item(item_id, item_name):
+    """向Emby发送请求，扫描指定项目的文件夹以发现新内容。"""
+    print(f"🔎 请求扫描 Emby 项目 ID: {item_id}, 名称: {item_name}")
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY]):
+        return "❌ 扫描失败：Emby服务器配置不完整。"
+
+    url = f"{EMBY_SERVER_URL}/Items/{item_id}/Refresh"
+    params = {'api_key': EMBY_API_KEY, 'Recursive': 'true'}
+    
+    response = make_request_with_retry('POST', url, params=params, timeout=30)
+    
+    if response and response.status_code == 204:
+        success_msg = f"✅ 已向 Emby 发送扫描请求： “{item_name}”。扫描过程将在后台进行，请稍后在 Emby 中查看结果。"
+        print(success_msg)
+        return success_msg
+    else:
+        status_code = response.status_code if response else 'N/A'
+        response_text = response.text if response else 'No Response'
+        error_msg = f'❌ 发送扫描请求 “{item_name}” (ID: {item_id}) 失败。状态码: {status_code}, 服务器响应: {response_text}'
+        print(error_msg)
+        return error_msg
+
+def scan_all_emby_libraries():
+    """向Emby发送请求，扫描所有媒体库以发现新内容。"""
+    print("🔎 请求扫描所有Emby媒体库...")
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY]):
+        return "❌ 扫描失败：Emby服务器配置不完整。"
+
+    url = f"{EMBY_SERVER_URL}/Library/Refresh"
+    params = {'api_key': EMBY_API_KEY}
+    
+    response = make_request_with_retry('POST', url, params=params, timeout=30)
+    
+    if response and response.status_code == 204:
+        success_msg = "✅ 已向 Emby 发送扫描所有媒体库的请求。任务将在后台执行。"
+        print(success_msg)
+        return success_msg
+    else:
+        status_code = response.status_code if response else 'N/A'
+        response_text = response.text if response else 'No Response'
+        error_msg = f'❌ 发送“扫描全部”请求失败。状态码: {status_code}, 响应: {response_text}'
+        print(error_msg)
+        return error_msg
+
+def refresh_emby_item(item_id, item_name):
+    """向Emby发送请求，刷新指定项目的元数据。"""
+    print(f"🔄 请求刷新 Emby 项目 ID: {item_id}, 名称: {item_name}")
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY]):
+        return "❌ 刷新失败：Emby服务器配置不完整。"
+
+    url = f"{EMBY_SERVER_URL}/Items/{item_id}/Refresh"
+    params = {
+        'api_key': EMBY_API_KEY,
+        'Recursive': 'true',
+        'MetadataRefreshMode': 'FullRefresh',
+        'ReplaceAllMetadata': 'true'
+    }
+    
+    response = make_request_with_retry('POST', url, params=params, timeout=30)
+    
+    if response and response.status_code == 204:
+        success_msg = f"✅ 已向 Emby 发送刷新请求： “{item_name}”。刷新过程将在后台进行，请稍后在 Emby 中查看结果。"
+        print(success_msg)
+        return success_msg
+    else:
+        status_code = response.status_code if response else 'N/A'
+        response_text = response.text if response else 'No Response'
+        error_msg = f'❌ 发送刷新请求 “{item_name}” (ID: {item_id}) 失败。状态码: {status_code}, 服务器响应: {response_text}'
+        print(error_msg)
+        return error_msg
+
 def delete_emby_item(item_id, item_name):
     """先获取 Access Token，然后使用 X-Emby-Authorization 头删除项目。"""
     print(f"🗑️ 请求从 Emby 删除项目 ID: {item_id}, 名称: {item_name}")
@@ -899,33 +978,158 @@ def get_tmdb_details_by_id(tmdb_id):
     print(f"❌ 未在 TMDB 中找到 ID 为 {tmdb_id} 的任何内容。")
     return None
 
+def _get_geo_baidu(ip):
+    """使用百度API获取地理位置。"""
+    url = f"https://opendata.baidu.com/api.php?co=&resource_id=6006&oe=utf8&query={ip}"
+    response = make_request_with_retry('GET', url, timeout=5)
+    if not response:
+        return "未知位置"
+    try:
+        data = response.json()
+        if data.get('status') == '0' and data.get('data'):
+            location_info = data['data'][0].get('location')
+            if location_info:
+                print(f"✅ 成功从百度 API 获取到 IP ({ip}) 的地理位置: {location_info}")
+                return location_info
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        print(f"❌ 解析百度 API 响应时发生错误。IP: {ip}, 错误: {e}")
+    return "未知位置"
+
+def _get_geo_ip138(ip):
+    """使用 IP138 API 获取地理位置。"""
+    token = CONFIG.get('settings', {}).get('ip_api_token_ip138')
+    if not token:
+        print("❌ IP138 API 错误: 未在 config.yaml 中配置 'ip_api_token_ip138'。")
+        return "未知位置 (缺少Token)"
+    
+    url = f"https://api.ip138.com/ipdata/?ip={ip}&datatype=jsonp&token={token}"
+    response = make_request_with_retry('GET', url, timeout=5)
+    if not response:
+        return "未知位置"
+    try:
+        content = response.text
+        if content.startswith('jsonp_'):
+            content = content[content.find('{') : content.rfind('}')+1]
+        
+        data = json.loads(content)
+        
+        if data.get('ret') == 'ok':
+            geo_data = data.get('data', [])
+            country = geo_data[0]
+            province = geo_data[1]
+            city = geo_data[2]
+            district = geo_data[3]
+            isp = geo_data[4]
+            
+            location = ""
+            if country == "中国":
+                loc_parts = []
+                if province:
+                    loc_parts.append(province)
+                if city and city != province:
+                    loc_parts.append(city)
+                if district:
+                    loc_parts.append(district)
+                
+                location = ''.join(p for p in loc_parts if p)
+            else:
+                loc_parts = [p for p in [country, province, city] if p]
+                location = ''.join(loc_parts)
+
+            return f"{location} {isp}".strip()
+
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        print(f"❌ 解析 IP138 API 响应时发生错误。IP: {ip}, 错误: {e}")
+    return "未知位置"
+
+def _get_geo_pconline(ip):
+    """使用太平洋电脑API获取地理位置。"""
+    url = f"https://whois.pconline.com.cn/ipJson.jsp?ip={ip}&json=true"
+    response = make_request_with_retry('GET', url, timeout=5)
+    if not response:
+        return "未知位置"
+    try:
+        data = response.json()
+        addr = data.get('addr')
+        if addr:
+            return addr.replace(ip, '').strip()
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"❌ 解析太平洋电脑 API 响应时发生错误。IP: {ip}, 错误: {e}")
+    return "未知位置"
+
+def _get_geo_vore(ip):
+    """使用Vore API获取地理位置。"""
+    url = f"https://api.vore.top/api/IPdata?ip={ip}"
+    response = make_request_with_retry('GET', url, timeout=5)
+    if not response:
+        return "未知位置"
+    try:
+        data = response.json()
+        if data.get('code') == 200 and data.get('adcode', {}).get('o'):
+            return data['adcode']['o'].replace(' - ', ' ')
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"❌ 解析 Vore API 响应时发生错误。IP: {ip}, 错误: {e}")
+    return "未知位置"
+
+def _get_geo_ipapi(ip):
+    """使用 IP-API.com 获取地理位置。"""
+    url = f"http://ip-api.com/json/{ip}?fields=status,message,country,regionName,city,isp&lang=zh-CN"
+    response = make_request_with_retry('GET', url, timeout=5)
+    if not response:
+        return "未知位置"
+    try:
+        data = response.json()
+        if data.get('status') == 'success':
+            isp_map = {
+                'Chinanet': '电信', 'China Telecom': '电信',
+                'China Unicom': '联通', 'CHINA169': '联通',
+                'CNC Group': '联通', 'China Netcom': '联通',
+                'China Mobile': '移动', 'China Broadcasting': '广电'
+            }
+            isp_en = data.get('isp', '')
+            isp = isp_en
+            for keyword, name in isp_map.items():
+                if keyword.lower() in isp_en.lower():
+                    isp = name
+                    break
+            
+            region = data.get('regionName', '')
+            city = data.get('city', '')
+            
+            if region and city and region in city:
+                city = ''
+            
+            geo_parts = [p for p in [region, city] if p]
+            location_part = ''.join(geo_parts)
+            
+            full_location = f"{location_part} {isp}".strip()
+            return full_location if full_location else "未知位置"
+
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"❌ 解析 IP-API.com 响应时发生错误。IP: {ip}, 错误: {e}")
+    return "未知位置"
+
 def get_ip_geolocation(ip):
-    """通过IP地址获取地理位置信息。"""
+    """通过IP地址获取地理位置信息（根据配置选择API）。"""
     if not ip or ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.'):
         return "局域网"
-    
-    url = f"https://opendata.baidu.com/api.php?co=&resource_id=6006&oe=utf8&query={ip}"
-    
-    response = make_request_with_retry('GET', url, timeout=5)
-    
-    if response:
-        try:
-            data = response.json()
-            if data.get('status') == '0' and data.get('data'):
-                location_info = data['data'][0].get('location')
-                if location_info:
-                    print(f"✅ 成功从百度 API 获取到 IP ({ip}) 的地理位置: {location_info}")
-                    return location_info
-                else:
-                    print(f"⚠️ 百度 API 响应成功，但未找到 location 信息。 IP: {ip}")
-            else:
-                error_msg = data.get('message', '未知错误')
-                print(f"❌ 百度 API 查询失败。IP: {ip}, 状态码: {data.get('status')}, 信息: {error_msg}")
 
-        except (json.JSONDecodeError, IndexError, KeyError) as e:
-            print(f"❌ 解析百度 API 响应时发生错误。IP: {ip}, 错误: {e}")
+    provider = get_setting('settings.ip_api_provider') or 'baidu'
+    print(f"🌍 正在使用 {provider.upper()} API 查询 IP: {ip}")
     
-    return "未知位置"
+    location = "未知位置"
+    if provider == 'ip138':
+        location = _get_geo_ip138(ip)
+    elif provider == 'pconline':
+        location = _get_geo_pconline(ip)
+    elif provider == 'vore':
+        location = _get_geo_vore(ip)
+    elif provider == 'ipapi':
+        location = _get_geo_ipapi(ip)
+    else:
+        location = _get_geo_baidu(ip)
+
+    return location
 
 def get_emby_user_by_name(username):
     """通过用户名获取完整的Emby用户对象。"""
@@ -1015,7 +1219,7 @@ def send_manage_main_menu(chat_id, user_id, message_id=None):
     """发送或编辑/manage命令的主菜单。"""
     prompt_message = "请选择管理类别："
     buttons = [
-        [{'text': '📽️ Emby节目管理', 'callback_data': f'm_filesmain_{user_id}'}],
+        [{'text': '🎦 Emby节目管理', 'callback_data': f'm_filesmain_{user_id}'}],
         [{'text': '👤 Emby用户管理', 'callback_data': f'm_usermain_{user_id}'}],
         [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]
     ]
@@ -1498,9 +1702,9 @@ def get_active_sessions_info(user_id):
             raw_user_name = session.get('UserName', '未知用户')
             raw_player = session.get('Client', '未知播放器')
             raw_device = session.get('DeviceName', '未知设备')
+            
             ip_address = session.get('RemoteEndPoint', '').split(':')[0]
             location = get_ip_geolocation(ip_address)
-            raw_location_str = f"{ip_address} {location}" if location != "局域网" else "局域网"
             
             raw_title = item.get('SeriesName') if item.get('Type') == 'Episode' else item.get('Name', '未知标题')
             year_str = f" ({year})" if year else ""
@@ -1524,8 +1728,14 @@ def get_active_sessions_info(user_id):
                 session_lines.append(f"播放器：{escape_markdown(raw_player)}")
             if get_setting('settings.content_settings.status_feedback.show_device'):
                 session_lines.append(f"设备：{escape_markdown(raw_device)}")
+            
             if get_setting('settings.content_settings.status_feedback.show_location'):
-                session_lines.append(f"位置：{escape_markdown(raw_location_str)}")
+                if location == "局域网":
+                    location_line = "位置：" + escape_markdown("局域网")
+                else:
+                    location_line = f"位置：`{escape_markdown(ip_address)}` {escape_markdown(location)}"
+                session_lines.append(location_line)
+
             if get_setting('settings.content_settings.status_feedback.show_media_detail'):
                 program_line = f"[{escape_markdown(program_full_title_raw)}]({tmdb_link})" if tmdb_link and get_setting('settings.content_settings.status_feedback.media_detail_has_tmdb_link') else escape_markdown(program_full_title_raw)
                 session_lines.append(f"节目：{program_line}")
@@ -2288,6 +2498,32 @@ def parse_episode_selection(s: str):
             mapping.setdefault(ctx_season, set()).add(e1)
     return mapping
 
+def get_emby_libraries():
+    """获取Emby中所有的媒体库（根文件夹）。"""
+    print("🗂️ 正在获取 Emby 媒体库列表...")
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY]):
+        return None, "Emby服务器配置不完整。"
+    
+    url = f"{EMBY_SERVER_URL}/Library/VirtualFolders"
+    params = {'api_key': EMBY_API_KEY}
+    response = make_request_with_retry('GET', url, params=params, timeout=10)
+    
+    if response:
+        try:
+            libraries = response.json()
+            lib_info = [{'name': lib.get('Name'), 'id': lib.get('ItemId')} 
+                        for lib in libraries if lib.get('Name') and lib.get('ItemId')]
+            
+            if not lib_info:
+                return None, "未能找到任何媒体库。"
+            
+            print(f"✅ 成功获取到 {len(lib_info)} 个媒体库。")
+            return lib_info, None
+        except (json.JSONDecodeError, KeyError) as e:
+            return None, f"解析媒体库列表失败: {e}"
+    
+    return None, "从Emby API获取媒体库列表失败。"
+
 def get_series_item_basic(series_id: str):
     """获取剧集基本信息（Name/Year/Path），失败返回 None。"""
     try:
@@ -2597,7 +2833,16 @@ def send_settings_menu(chat_id, user_id, message_id=None, menu_key='root'):
         text_parts.append("管理机器人的各项功能与通知！")
         
     buttons = []
-    if 'children' in node:
+    if menu_key == 'ip_api_selection':
+        text_parts.append("请选择一个IP地理位置查询服务接口。")
+        current_provider = get_setting('settings.ip_api_provider') or 'baidu'
+        for child_key in node['children']:
+            child_node = SETTINGS_MENU_STRUCTURE[child_key]
+            api_value = child_node['config_value']
+            is_selected = (api_value == current_provider)
+            status_icon = "✅" if is_selected else " "
+            buttons.append([{'text': f"{status_icon} {child_node['label']}", 'callback_data': f'set_ipapi_{api_value}_{user_id}'}])
+    elif 'children' in node:
         for child_key in node['children']:
             child_node = SETTINGS_MENU_STRUCTURE[child_key]
             if 'children' in child_node:
@@ -2694,6 +2939,34 @@ def handle_callback_query(callback_query):
     clicker_id = callback_query['from']['id']
     chat_id = message.get('chat', {}).get('id')
     message_id = message.get('message_id')
+
+    if data.startswith('set_ipapi_'):
+        if not is_super_admin(clicker_id):
+            answer_callback_query(query_id, text="抱歉，此操作仅对超级管理员开放。", show_alert=True)
+            return
+        
+        try:
+            params_str = data[len('set_ipapi_'):]
+            provider, initiator_id_str = params_str.split('_', 1)
+
+            if str(clicker_id) != initiator_id_str:
+                answer_callback_query(query_id, text="交互由其他用户发起，您无法操作！", show_alert=True)
+                return
+
+            set_setting('settings.ip_api_provider', provider)
+            save_config()
+            
+            provider_map = {
+                'baidu': '百度 API', 'ip138': 'IP138 API', 'pconline': '太平洋电脑 API',
+                'vore': 'Vore API', 'ipapi': 'IP-API.com'
+            }
+            provider_name = provider_map.get(provider, provider)
+            
+            answer_callback_query(query_id, text=f"API 已切换至: {provider_name}")
+            send_settings_menu(chat_id, int(initiator_id_str), message_id, menu_key='ip_api_selection')
+        except ValueError:
+            answer_callback_query(query_id, text="回调参数错误。", show_alert=True)
+        return
 
     if data.startswith('mdc_'):
         try:
@@ -2813,7 +3086,7 @@ def handle_callback_query(callback_query):
 
             if t == 'seasons':
                 params = {'api_key': EMBY_API_KEY, 'ParentId': series_id, 'IncludeItemTypes': 'Season',
-                          'Fields': 'IndexNumber,Name'}
+                            'Fields': 'IndexNumber,Name'}
                 resp = make_request_with_retry('GET', items_api, params=params, timeout=15)
                 seasons = resp.json().get('Items', []) if resp else []
                 target = [s for s in seasons if (s.get('IndexNumber') in _task['seasons'])]
@@ -2827,7 +3100,7 @@ def handle_callback_query(callback_query):
 
             if t == 'episodes':
                 params = {'api_key': EMBY_API_KEY, 'ParentId': series_id, 'IncludeItemTypes': 'Episode',
-                          'Recursive': 'true', 'Fields': 'ParentIndexNumber,IndexNumber,Name'}
+                            'Recursive': 'true', 'Fields': 'ParentIndexNumber,IndexNumber,Name'}
                 resp = make_request_with_retry('GET', items_api, params=params, timeout=20)
                 eps = resp.json().get('Items', []) if resp else []
                 want = []
@@ -2970,25 +3243,38 @@ def handle_callback_query(callback_query):
         return
 
     if command == 'm':
+        parts = rest_of_data.split('_')
+        action = parts[0]
+        
+        if len(parts) > 1:
+            if parts[0] in ['scanitem', 'scanlibrary', 'scanall', 'userdelete', 'deleteemby', 'deletelocal', 'deletecloud', 'deleteboth', 'refresh'] and parts[1] == 'confirm':
+                action = f"{parts[0]}confirm"
+            elif parts[0] == 'scanlibrary' and parts[1] == 'execute':
+                action = 'scanlibraryexecute'
+            elif parts[0] == 'scanall' and parts[1] == 'execute':
+                action = 'scanallexecute'
+
+        rest_params = rest_of_data[len(action)+1:] if rest_of_data.startswith(action + '_') else ''
+        if not rest_params and len(parts) > 1 and action == parts[0]:
+             rest_params = '_'.join(parts[1:])
+
         try:
-            initiator_id_str = rest_of_data.rsplit('_', 1)[-1]
+            initiator_id_str = rest_params.rsplit('_', 1)[-1]
             if initiator_id_str.isdigit():
                 if not is_super_admin(clicker_id) and str(clicker_id) != initiator_id_str:
                     answer_callback_query(query_id, text="交互由其他用户发起，您无法操作！", show_alert=True)
                     return
         except (ValueError, IndexError):
-            answer_callback_query(query_id, text="无效的回调操作。", show_alert=True)
-            return
+            pass
 
-        action, rest_params = rest_of_data.split('_', 1)
-        
         if action == 'filesmain':
             initiator_id_str = rest_params.split('_')[0]
             answer_callback_query(query_id)
             prompt_message = "请选择节目和文件管理操作："
             buttons = [
-                [{'text': '🔄 管理Emby中已有的节目', 'callback_data': f'm_searchshow_dummy_{initiator_id_str}'}],
-                [{'text': '⬇️ 从网盘更新一个新节目', 'callback_data': f'm_addfromcloud_dummy_{initiator_id_str}'}],
+                [{'text': '🔀 管理单个节目', 'callback_data': f'm_searchshow_dummy_{initiator_id_str}'}],
+                [{'text': '🔎 扫描媒体库', 'callback_data': f'm_scanlibrary_{initiator_id_str}'}],
+                [{'text': '⬇️ 从网盘同步新节目', 'callback_data': f'm_addfromcloud_dummy_{initiator_id_str}'}],
                 [{'text': '◀️ 返回上一级', 'callback_data': f'm_backtomain_{initiator_id_str}'}],
                 [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{initiator_id_str}'}]
             ]
@@ -3075,7 +3361,7 @@ def handle_callback_query(callback_query):
 
         if action == 'doupdate':
             update_uuid, initiator_id_str = rest_params.rsplit('_', 1)
-            answer_callback_query(query_id, "正在从网盘更新文件...", show_alert=False)
+            answer_callback_query(query_id, "正在从网盘同步文件...", show_alert=False)
 
             base_path = UPDATE_PATH_CACHE.pop(update_uuid, None)
             if not base_path:
@@ -3112,27 +3398,135 @@ def handle_callback_query(callback_query):
             answer_callback_query(query_id)
             delete_telegram_message(chat_id, message_id)
             buttons = [
+                [{'text': '🗂️ 扫描文件夹', 'callback_data': f'm_scanitem_{item_id}_{initiator_id_str}'}],
+                [{'text': '🔄 刷新元数据', 'callback_data': f'm_refresh_{item_id}_{initiator_id_str}'}],
                 [{'text': '❌ 删除该节目', 'callback_data': f'm_delete_{item_id}_{initiator_id_str}'}],
                 [{'text': '🔄 更新该节目', 'callback_data': f'm_update_{item_id}_{initiator_id_str}'}],
                 [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{initiator_id_str}'}]
             ]
             send_deletable_telegram_notification(text="请选择要对该节目执行的文件操作：", chat_id=chat_id, inline_buttons=buttons, delay_seconds=120)
             return
+        
+        if action == 'scanitem':
+            item_id, initiator_id_str = rest_params.split('_')
+            answer_callback_query(query_id)
+            item_info = get_series_item_basic(item_id)
+            item_name = item_info.get('Name', f"ID: {item_id}") if item_info else f"ID: {item_id}"
+            prompt_text = f"❓ 您确定要扫描 *{escape_markdown(item_name)}* 所在的文件夹吗？\n\n此操作会查找新增或变更的文件（例如新剧集）。"
+            buttons = [
+                [{'text': '⚠️ 是的，扫描', 'callback_data': f'm_scanitemconfirm_{item_id}_{initiator_id_str}'}],
+                [{'text': '◀️ 返回', 'callback_data': f'm_files_{item_id}_{initiator_id_str}'}]
+            ]
+            edit_telegram_message(chat_id, message_id, prompt_text, inline_buttons=buttons)
+            return
+
+        if action == 'scanitemconfirm':
+            item_id, initiator_id_str = rest_params.split('_')
+            answer_callback_query(query_id, "正在发送扫描请求...", show_alert=False)
+            item_info = get_series_item_basic(item_id)
+            item_name = item_info.get('Name', f"ID: {item_id}") if item_info else f"ID: {item_id}"
+            result_message = scan_emby_item(item_id, item_name)
+            edit_telegram_message(chat_id, message_id, escape_markdown(result_message), inline_buttons=[])
+            delete_user_message_later(chat_id, message_id, 90)
+            return
+            
+        if action == 'refresh':
+            item_id, initiator_id_str = rest_params.split('_')
+            answer_callback_query(query_id)
+            item_info = get_series_item_basic(item_id)
+            item_name = item_info.get('Name', f"ID: {item_id}") if item_info else f"ID: {item_id}"
+            prompt_text = f"❓ 您确定要刷新 *{escape_markdown(item_name)}* 的元数据吗？\n\n此操作会重新扫描所有相关文件并从网上获取信息。"
+            buttons = [
+                [{'text': '⚠️ 是的，刷新', 'callback_data': f'm_refreshconfirm_{item_id}_{initiator_id_str}'}],
+                [{'text': '◀️ 返回', 'callback_data': f'm_files_{item_id}_{initiator_id_str}'}]
+            ]
+            edit_telegram_message(chat_id, message_id, prompt_text, inline_buttons=buttons)
+            return
+
+        if action == 'refreshconfirm':
+            item_id, initiator_id_str = rest_params.split('_')
+            answer_callback_query(query_id, "正在发送刷新请求...", show_alert=False)
+            item_info = get_series_item_basic(item_id)
+            item_name = item_info.get('Name', f"ID: {item_id}") if item_info else f"ID: {item_id}"
+            result_message = refresh_emby_item(item_id, item_name)
+            edit_telegram_message(chat_id, message_id, escape_markdown(result_message), inline_buttons=[])
+            delete_user_message_later(chat_id, message_id, 90)
+            return
+        
+        if action == 'scanlibrary':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id, text="正在获取媒体库列表...")
+            libraries, error = get_emby_libraries()
+            if error:
+                edit_telegram_message(chat_id, message_id, escape_markdown(f"❌ 获取媒体库失败: {error}"), inline_buttons=[])
+                return
+            buttons = []
+            buttons.append([{'text': '💥 扫描所有媒体库', 'callback_data': f"m_scanallconfirm_{initiator_id_str}"}])
+            for lib in libraries:
+                lib_name_b64 = base64.b64encode(lib['name'].encode('utf-8')).decode('utf-8')
+                buttons.append([{'text': f"🗂️ {lib['name']}", 'callback_data': f"m_scanlibraryconfirm_{lib['id']}_{lib_name_b64}_{initiator_id_str}"}])
+            buttons.append([{'text': '◀️ 返回上一级', 'callback_data': f'm_filesmain_{initiator_id_str}'}])
+            edit_telegram_message(chat_id, message_id, escape_markdown("请选择要扫描的媒体库："), inline_buttons=buttons)
+            return
+
+        if action == 'scanallconfirm':
+            initiator_id_str = rest_params
+            answer_callback_query(query_id)
+            prompt_text = f"❓ 您确定要扫描 **所有** 媒体库吗？\n\n此操作会消耗较多服务器资源，可能需要一些时间。"
+            buttons = [
+                [{'text': '⚠️ 是的，全部扫描', 'callback_data': f'm_scanallexecute_{initiator_id_str}'}],
+                [{'text': '◀️ 返回', 'callback_data': f'm_scanlibrary_{initiator_id_str}'}]
+            ]
+            edit_telegram_message(chat_id, message_id, prompt_text, inline_buttons=buttons)
+            return
+
+        if action == 'scanallexecute':
+            initiator_id_str = rest_params
+            answer_callback_query(query_id, "正在发送全局扫描请求...", show_alert=False)
+            result_message = scan_all_emby_libraries()
+            edit_telegram_message(chat_id, message_id, escape_markdown(result_message), inline_buttons=[])
+            delete_user_message_later(chat_id, message_id, 90)
+            return
+
+        if action == 'scanlibraryconfirm':
+            try:
+                lib_id, lib_name_b64, initiator_id_str = rest_params.split('_', 2)
+                lib_name = base64.b64decode(lib_name_b64).decode('utf-8')
+            except Exception:
+                answer_callback_query(query_id, text="回调参数错误", show_alert=True)
+                return
+            answer_callback_query(query_id)
+            prompt_text = f"❓ 您确定要扫描媒体库 *{escape_markdown(lib_name)}* 吗？\n\n此操作可能需要一些时间。"
+            buttons = [
+                [{'text': '⚠️ 是的，扫描', 'callback_data': f"m_scanlibraryexecute_{lib_id}_{lib_name_b64}_{initiator_id_str}"}],
+                [{'text': '◀️ 返回', 'callback_data': f'm_scanlibrary_{initiator_id_str}'}]
+            ]
+            edit_telegram_message(chat_id, message_id, prompt_text, inline_buttons=buttons)
+            return
+
+        if action == 'scanlibraryexecute':
+            try:
+                lib_id, lib_name_b64, initiator_id_str = rest_params.split('_', 2)
+                lib_name = base64.b64decode(lib_name_b64).decode('utf-8')
+            except Exception:
+                answer_callback_query(query_id, text="回调参数错误", show_alert=True)
+                return
+            answer_callback_query(query_id, "正在发送扫描请求...", show_alert=False)
+            result_message = scan_emby_item(lib_id, lib_name)
+            edit_telegram_message(chat_id, message_id, escape_markdown(result_message), inline_buttons=[])
+            delete_user_message_later(chat_id, message_id, 90)
+            return
 
         if action == 'delete':
             item_id, initiator_id_str = rest_params.split('_')
             answer_callback_query(query_id, "正在获取节目类型...")
-
             full_item_url = f"{EMBY_SERVER_URL}/Users/{EMBY_USER_ID}/Items/{item_id}"
             params = {'api_key': EMBY_API_KEY, 'Fields': 'Type'}
             response = make_request_with_retry('GET', full_item_url, params=params, timeout=10)
-
             if not response:
                 edit_telegram_message(chat_id, message_id, escape_markdown("❌ 获取节目类型失败，请重试。"), inline_buttons=[])
                 return
-
             item_type = response.json().get('Type')
-
             if item_type == 'Movie':
                 buttons = [
                     [{'text': '⏏️ 从Emby中删除节目', 'callback_data': f'm_deleteemby_{item_id}_{initiator_id_str}'}],
@@ -3154,7 +3548,6 @@ def handle_callback_query(callback_query):
                 edit_telegram_message(chat_id, message_id, escape_markdown("检测到该节目为**剧集**，请选择需要删除的内容："), inline_buttons=buttons)
             else:
                 edit_telegram_message(chat_id, message_id, escape_markdown(f"❌ 不支持的节目类型: {item_type}，无法执行删除操作。"), inline_buttons=[])
-            
             return
 
         if action == 'deleteall':
@@ -3727,7 +4120,7 @@ def handle_telegram_command(message):
                 tmdb_link = f"https://www.themoviedb.org/{tmdb_url_type}/{tmdb_id}"
 
                 message_parts = [
-                    f"请确认是否要从网盘更新以下节目：",
+                    f"请确认是否要从网盘同步以下节目：",
                     f"\n名称：[{escape_markdown(f'{title} ({year})')}]({tmdb_link})",
                     f"分类：{escape_markdown(media_type_folder)}",
                     f"剧情：{escape_markdown(overview[:150] + '...' if len(overview) > 150 else overview)}"
@@ -3739,7 +4132,7 @@ def handle_telegram_command(message):
                 UPDATE_PATH_CACHE[update_uuid] = target_path_for_emby
 
                 buttons = [
-                    [{'text': '⬇️ 确认并开始更新', 'callback_data': f'm_doupdate_{update_uuid}_{user_id}'}],
+                    [{'text': '⬇️ 确认并开始同步', 'callback_data': f'm_doupdate_{update_uuid}_{user_id}'}],
                     [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]
                 ]
                 
@@ -4419,7 +4812,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     location = get_ip_geolocation(ip_address)
                     parts.append(f"客户端: {escape_markdown(session_info.get('Client'))}")
                     parts.append(f"设备: {escape_markdown(session_info.get('DeviceName'))}")
-                    parts.append(f"位置: {escape_markdown(f'{ip_address} {location}')}")
+                    parts.append(f"位置: `{escape_markdown(ip_address)}` {escape_markdown(location)}")
                 
                 elif event_type == "user.authenticationfailed":
                     icon = "⚠️"
@@ -4434,7 +4827,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     device_info = event_data.get("DeviceInfo", {})
                     parts.append(f"客户端: {escape_markdown(device_info.get('AppName'))}")
                     parts.append(f"设备: {escape_markdown(device_info.get('Name'))}")
-                    parts.append(f"位置: {escape_markdown(f'{ip_address} {location}')}")
+                    parts.append(f"位置: `{escape_markdown(ip_address)}` {escape_markdown(location)}")
                 
                     if username != "未知":
                         all_users = get_all_emby_users()
@@ -4549,11 +4942,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
                     parts.append(f"播放器：{escape_markdown((session or {}).get('Client', ''))}")
                 if get_setting('settings.content_settings.playback_action.show_device'):
                     parts.append(f"设备：{escape_markdown((session or {}).get('DeviceName', ''))}")
+
                 if get_setting('settings.content_settings.playback_action.show_location'):
                     ip = (session or {}).get('RemoteEndPoint', '').split(':')[0]
                     loc = get_ip_geolocation(ip)
-                    parts.append(f"位置：{escape_markdown('局域网' if loc == '局域网' else f'{ip} {loc}')}")
-
+                    if loc == "局域网":
+                        parts.append(f"位置：{escape_markdown('局域网')}")
+                    else:
+                        parts.append(f"位置：`{escape_markdown(ip)}` {escape_markdown(loc)}")
+                
                 if get_setting('settings.content_settings.playback_action.show_progress'):
                     pos_ticks, run_ticks = (playback_info or {}).get('PositionTicks'), item.get('RunTimeTicks')
                     if pos_ticks is not None and run_ticks and run_ticks > 0:
@@ -4632,7 +5029,7 @@ def run_server(server_class=HTTPServer, handler_class=WebhookHandler, port=8080)
     """启动HTTP服务器。"""
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
-    print(f"服务器已在 http://0.0.0.0:{port} 启动...")
+    print(f"🚀 服务器已在 http://0.0.0.0:{port} 启动...")
     httpd.serve_forever()
 
 if __name__ == '__main__':
