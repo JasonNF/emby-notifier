@@ -323,11 +323,14 @@ EMBY_PASSWORD = CONFIG.get('emby', {}).get('password')
 EMBY_REMOTE_URL = CONFIG.get('emby', {}).get('remote_url')
 APP_SCHEME = CONFIG.get('emby', {}).get('app_scheme')
 ALLOWED_GROUP_ID = GROUP_ID
+EMBY_TEMPLATE_USER_ID = CONFIG.get('emby', {}).get('template_user_id')
 
 # 检查必要配置
 if not TELEGRAM_TOKEN or not ADMIN_USER_ID:
-    print("错误：TELEGRAM_TOKEN 或 ADMIN_USER_ID 未在 config.yaml 中正确设置")
+    print("❌ 错误：TELEGRAM_TOKEN 或 ADMIN_USER_ID 未在 config.yaml 中正确设置")
     exit(1)
+if not EMBY_TEMPLATE_USER_ID:
+    print("⚠️ 警告: 'template_user_id' 未在 config.yaml 中配置，用户创建功能将不可用。")
 print("🚀 初始化完成。")
 
 def make_request_with_retry(method, url, max_retries=3, retry_delay=1, **kwargs):
@@ -443,7 +446,10 @@ def make_request_with_retry(method, url, max_retries=3, retry_delay=1, **kwargs)
                 return None
 
         except requests.exceptions.RequestException as e:
-            print(f"❌ {api_name} API 请求发生网络错误 (第 {attempts + 1} 次)，URL: {display_url}, 错误: {e}")
+            error_message = str(e)
+            if TELEGRAM_TOKEN:
+                error_message = error_message.replace(TELEGRAM_TOKEN, "[REDACTED_TOKEN]")
+            print(f"❌ {api_name} API 请求发生网络错误 (第 {attempts + 1} 次)，URL: {display_url}, 错误: {error_message}")
 
         attempts += 1
         if attempts < max_retries:
@@ -920,6 +926,146 @@ def get_ip_geolocation(ip):
             print(f"❌ 解析百度 API 响应时发生错误。IP: {ip}, 错误: {e}")
     
     return "未知位置"
+
+def get_emby_user_by_name(username):
+    """通过用户名获取完整的Emby用户对象。"""
+    print(f"👤 正在通过用户名 '{username}' 查询Emby用户...")
+    if not all([EMBY_SERVER_URL, EMBY_API_KEY]):
+        return None, "Emby服务器配置不完整。"
+    
+    url = f"{EMBY_SERVER_URL}/Users"
+    params = {'api_key': EMBY_API_KEY}
+    response = make_request_with_retry('GET', url, params=params, timeout=10)
+    
+    if response:
+        users_data = response.json()
+        for user in users_data:
+            if user.get('Name', '').lower() == username.lower():
+                print(f"✅ 找到用户 '{username}'，ID: {user.get('Id')}")
+                return user, None
+        return None, f"找不到用户名为 '{username}' 的用户。"
+    else:
+        return None, "从Emby API获取用户列表失败。"
+
+def get_emby_user_policy(user_id):
+    """获取指定用户的策略(Policy)对象。"""
+    print(f"📜 正在获取用户ID {user_id} 的完整信息以提取策略...")
+    
+    url = f"{EMBY_SERVER_URL}/Users/{user_id}"
+    params = {'api_key': EMBY_API_KEY}
+    response = make_request_with_retry('GET', url, params=params, timeout=10)
+    
+    if response:
+        try:
+            user_data = response.json()
+            policy = user_data.get('Policy')
+            if policy:
+                return policy, None
+            else:
+                return None, "获取用户策略失败：在返回的用户数据中未找到Policy对象。"
+        except json.JSONDecodeError:
+            return None, "获取用户策略失败：无法解析Emby服务器返回的用户信息。"
+    
+    return None, "获取用户策略失败：无法从Emby API获取该用户信息（请检查template_user_id是否正确）。"
+
+def set_emby_user_password(user_id, password):
+    """设置或修改用户的密码。"""
+    print(f"🔑 正在为用户ID {user_id} 设置新密码...")
+    url = f"{EMBY_SERVER_URL}/Users/{user_id}/Password"
+    headers = {'X-Emby-Token': EMBY_API_KEY}
+    payload = {"Id": user_id, "NewPw": password}
+    response = make_request_with_retry('POST', url, headers=headers, json=payload, timeout=10)
+    return response is not None
+
+def delete_emby_user_by_id(user_id):
+    """通过ID删除一个Emby用户。"""
+    print(f"🗑️ 正在删除用户ID: {user_id}")
+    url = f"{EMBY_SERVER_URL}/Users/{user_id}"
+    params = {'api_key': EMBY_API_KEY}
+    response = make_request_with_retry('DELETE', url, params=params, timeout=10)
+    return response is not None
+
+def rename_emby_user(user_id, new_username):
+    """修改指定Emby用户的用户名。"""
+    print(f"✏️ 正在为用户ID {user_id} 修改用户名为 '{new_username}'...")
+    
+    existing_user, _ = get_emby_user_by_name(new_username)
+    if existing_user:
+        return f"❌ 修改失败：用户名 '{new_username}' 已被其他用户占用。"
+
+    get_url = f"{EMBY_SERVER_URL}/Users/{user_id}"
+    params = {'api_key': EMBY_API_KEY}
+    get_response = make_request_with_retry('GET', get_url, params=params, timeout=10)
+    if not get_response:
+        return "❌ 修改失败：无法获取当前用户的详细信息。"
+    
+    user_data = get_response.json()
+    
+    user_data['Name'] = new_username
+    post_url = f"{EMBY_SERVER_URL}/Users/{user_id}"
+    headers = {'X-Emby-Token': EMBY_API_KEY, 'Content-Type': 'application/json'}
+    post_response = make_request_with_retry('POST', post_url, headers=headers, json=user_data, timeout=10)
+
+    if post_response:
+        return f"✅ 用户名已成功修改为 '{new_username}'。"
+    else:
+        return f"❌ 修改用户名失败，服务器未成功响应。"
+
+def send_manage_main_menu(chat_id, user_id, message_id=None):
+    """发送或编辑/manage命令的主菜单。"""
+    prompt_message = "请选择管理类别："
+    buttons = [
+        [{'text': '📽️ Emby节目管理', 'callback_data': f'm_filesmain_{user_id}'}],
+        [{'text': '👤 Emby用户管理', 'callback_data': f'm_usermain_{user_id}'}],
+        [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]
+    ]
+    if message_id:
+        edit_telegram_message(chat_id, message_id, escape_markdown(prompt_message), inline_buttons=buttons)
+    else:
+        send_deletable_telegram_notification(escape_markdown(prompt_message), chat_id=chat_id, inline_buttons=buttons, delay_seconds=180)
+
+def create_emby_user(username, password):
+    """创建一个新Emby用户，并从模板用户克隆配置。"""
+    if not EMBY_TEMPLATE_USER_ID:
+        return "❌ 创建失败：未在配置文件中设置 `template_user_id`。"
+
+    existing_user, _ = get_emby_user_by_name(username)
+    if existing_user:
+        return f"❌ 创建失败：用户名 '{username}' 已存在。"
+
+    template_policy, error = get_emby_user_policy(EMBY_TEMPLATE_USER_ID)
+    if error:
+        return f"❌ 创建失败：无法获取模板用户(ID: {EMBY_TEMPLATE_USER_ID})的配置。错误: {error}"
+    print(f"✅ 已成功获取模板用户 {EMBY_TEMPLATE_USER_ID} 的策略。")
+
+    print(f"➕ 正在创建新用户: {username}...")
+    create_url = f"{EMBY_SERVER_URL}/Users/New"
+    params = {'api_key': EMBY_API_KEY}
+    create_payload = {'Name': username}
+    response = make_request_with_retry('POST', create_url, params=params, json=create_payload, timeout=10)
+    
+    if not response:
+        return "❌ 创建失败：调用Emby API创建用户时出错。"
+    
+    new_user = response.json()
+    new_user_id = new_user.get('Id')
+    print(f"✅ 用户 '{username}' 已创建，新ID: {new_user_id}。")
+
+    print(f"📜 正在为新用户 {new_user_id} 应用模板策略...")
+    policy_url = f"{EMBY_SERVER_URL}/Users/{new_user_id}/Policy"
+    policy_resp = make_request_with_retry('POST', policy_url, params=params, json=template_policy, timeout=10)
+    if not policy_resp:
+        delete_emby_user_by_id(new_user_id)
+        return "❌ 创建失败：为新用户应用策略时出错，已回滚操作。"
+    print("✅ 策略应用成功。")
+
+    print(f"🔑 正在为新用户 {new_user_id} 设置密码...")
+    if not set_emby_user_password(new_user_id, password):
+        delete_emby_user_by_id(new_user_id)
+        return "❌ 创建失败：为新用户设置密码时出错，已回滚操作。"
+    print("✅ 密码设置成功。")
+    
+    return f"✅ 成功创建用户 '{username}'，配置已从模板用户克隆。"
 
 def get_all_emby_users():
     """从Emby获取所有用户列表，并使用1分钟缓存。"""
@@ -2037,9 +2183,26 @@ def format_stream_details_message(stream_details, is_season_info=False, prefix='
 
     subtitle_info_list = stream_details.get('subtitle_info')
     if subtitle_info_list and get_setting(subtitle_setting_path):
+        
+        priority_map = {
+            'chi': 0, 'zho': 0,
+            'eng': 1,
+            'jpn': 2,
+            'kor': 3
+        }
+        DEFAULT_PRIORITY = 99
+
+        sorted_subtitles = sorted(
+            subtitle_info_list,
+            key=lambda s: priority_map.get(s.get('language', 'und').lower(), DEFAULT_PRIORITY)
+        )
+
         subtitle_lines = []
         seen_tracks = set()
-        for s_info in subtitle_info_list:
+        total_sub_count = len(sorted_subtitles)
+        max_display_subs = 5
+
+        for s_info in sorted_subtitles[:max_display_subs]:
             lang_code = s_info.get('language', 'und').lower()
             lang_display = LANG_MAP.get(lang_code, {}).get('zh', lang_code.capitalize())
             
@@ -2052,7 +2215,11 @@ def format_stream_details_message(stream_details, is_season_info=False, prefix='
 
         if subtitle_lines:
             full_subtitle_str = "、".join(subtitle_lines)
-            label = "字幕规格：" if prefix == 'new_library_notification' or prefix == 'playback_action' else "字幕："
+
+            if total_sub_count > max_display_subs:
+                full_subtitle_str += f" 等共计{total_sub_count}个字幕"
+
+            label = "字幕规格：" if prefix in ['new_library_notification', 'playback_action'] else "字幕："
             indent = "    " if is_season_info else ""
             message_parts.append(f"{indent}{label}{full_subtitle_str}")
             
@@ -2510,9 +2677,9 @@ def post_update_result_to_telegram(*, chat_id: int, message_id: int, callback_me
 def handle_callback_query(callback_query):
     """
     处理内联按钮回调：
-    - 保留你原有的 n_/t_/c_/s_/m_/session_ 等分支
-    - 新增 mdc_*_<shortid>：短码删除确认（Emby/本地/网盘/本地+网盘）
-    - 新增 m_delete 分支：展示“删除整个节目/季/集”的二级菜单及相应的输入引导
+    - 增加多层级管理菜单
+    - 增加修改用户名功能
+    - 增加退出按钮
     """
     global DELETION_TASK_CACHE, user_context, UPDATE_PATH_CACHE
 
@@ -2815,6 +2982,66 @@ def handle_callback_query(callback_query):
 
         action, rest_params = rest_of_data.split('_', 1)
         
+        if action == 'filesmain':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            prompt_message = "请选择节目和文件管理操作："
+            buttons = [
+                [{'text': '🔄 管理Emby中已有的节目', 'callback_data': f'm_searchshow_dummy_{initiator_id_str}'}],
+                [{'text': '⬇️ 从网盘更新一个新节目', 'callback_data': f'm_addfromcloud_dummy_{initiator_id_str}'}],
+                [{'text': '◀️ 返回上一级', 'callback_data': f'm_backtomain_{initiator_id_str}'}],
+                [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{initiator_id_str}'}]
+            ]
+            edit_telegram_message(chat_id, message_id, escape_markdown(prompt_message), inline_buttons=buttons)
+            return
+
+        if action == 'backtomain':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            send_manage_main_menu(chat_id, int(initiator_id_str), message_id)
+            return
+
+        if action == 'usermain':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            buttons = [
+                [{'text': '➕ 创建用户', 'callback_data': f'm_usercreate_{initiator_id_str}'}],
+                [{'text': '✏️ 修改用户名', 'callback_data': f'm_userrename_{initiator_id_str}'}],
+                [{'text': '🔑 修改密码', 'callback_data': f'm_userpass_{initiator_id_str}'}],
+                [{'text': '🗑️ 删除用户', 'callback_data': f'm_userdelete_{initiator_id_str}'}],
+                [{'text': '◀️ 返回上一级', 'callback_data': f'm_backtomain_{initiator_id_str}'}],
+                [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{initiator_id_str}'}]
+            ]
+            edit_telegram_message(chat_id, message_id, "请选择用户管理操作：", inline_buttons=buttons)
+            return
+
+        if action == 'userrename':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            prompt = "✍️ 请输入用户的 **旧用户名** 和 **新用户名**，用空格隔开。\n\n*注意：新旧用户名本身均不允许包含空格。*"
+            user_context[chat_id] = {'state': 'awaiting_rename_info', 'initiator_id': int(initiator_id_str), 'message_id': message_id}
+            edit_telegram_message(chat_id, message_id, escape_markdown(prompt))
+            return
+
+        if action == 'usercreate':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            if not EMBY_TEMPLATE_USER_ID:
+                edit_telegram_message(chat_id, message_id, escape_markdown("❌ 操作失败: 未在 config.yaml 中配置 `template_user_id`。"), inline_buttons=[])
+                return
+            prompt = "✍️ 请输入 **用户名** 和 **初始密码**（可选），用空格隔开。\n\n*注意：*\n*1. 用户名和密码本身均不允许包含空格。\n2. 若只输入用户名，密码将设置为空。*"
+            user_context[chat_id] = {'state': 'awaiting_new_user_credentials', 'initiator_id': int(initiator_id_str), 'message_id': message_id}
+            edit_telegram_message(chat_id, message_id, escape_markdown(prompt))
+            return
+            
+        if action == 'userpass':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            prompt = "✍️ 请输入要修改密码的 **用户名** 和 **新密码**（可选），用空格隔开。\n\n*注意：*\n*1. 用户名和密码本身均不允许包含空格。\n2. 若只输入用户名，密码将设置为空。*"
+            user_context[chat_id] = {'state': 'awaiting_password_change_info', 'initiator_id': int(initiator_id_str), 'message_id': message_id}
+            edit_telegram_message(chat_id, message_id, escape_markdown(prompt))
+            return
+        
         if action == 'searchshow':
             answer_callback_query(query_id)
             prompt_text = "✍️ 请输入需要管理的节目名称（可包含年份）或 TMDB ID。"
@@ -2827,6 +3054,23 @@ def handle_callback_query(callback_query):
             prompt_text = "✍️ 请输入节目名称、年份、节目类型（用空格分隔，如 `凡人修仙传 2025 国产剧`）："
             user_context[chat_id] = {'state': 'awaiting_new_show_info', 'initiator_id': clicker_id, 'message_id': message_id}
             edit_telegram_message(chat_id, message_id, escape_markdown(prompt_text))
+            return
+            
+        if action == 'userdelete':
+            initiator_id_str = rest_params.split('_')[0]
+            answer_callback_query(query_id)
+            prompt = "✍️ 请输入您要删除的Emby用户的 **准确用户名**。"
+            user_context[chat_id] = {'state': 'awaiting_user_to_delete', 'initiator_id': int(initiator_id_str), 'message_id': message_id}
+            edit_telegram_message(chat_id, message_id, escape_markdown(prompt))
+            return
+            
+        if action == 'userdeleteconfirm':
+            user_id_to_delete, initiator_id_str = rest_params.split('_')
+            answer_callback_query(query_id, "正在执行删除...", show_alert=False)
+            success = delete_emby_user_by_id(user_id_to_delete)
+            result_message = f"✅ 用户(ID: {user_id_to_delete}) 已成功删除。" if success else f"❌ 删除用户(ID: {user_id_to_delete}) 失败。"
+            edit_telegram_message(chat_id, message_id, escape_markdown(result_message), inline_buttons=[])
+            delete_user_message_later(chat_id, message_id, 60)
             return
 
         if action == 'doupdate':
@@ -3068,7 +3312,7 @@ def handle_callback_query(callback_query):
         if action == 'exit':
             answer_callback_query(query_id)
             delete_telegram_message(chat_id, message_id)
-            send_simple_telegram_message("✅ 已退出文件管理。", chat_id=chat_id, delay_seconds=15)
+            send_simple_telegram_message("✅ 已退出管理。", chat_id=chat_id, delay_seconds=15)
             return
         return
 
@@ -3140,8 +3384,8 @@ def handle_callback_query(callback_query):
 def handle_telegram_command(message):
     """
     处理用户在聊天中直接输入的命令/文本。
-    - 维持原有 /start /status /settings /manage /search 流程
-    - 新增：处理“删除季/删除集”的文本输入（等待态）
+    - 新增多层级 /manage 菜单
+    - 增加修改用户名、允许空密码等新逻辑
     """
     global user_search_state, user_context, DELETION_TASK_CACHE
 
@@ -3182,6 +3426,100 @@ def handle_telegram_command(message):
                 return
 
             state = ctx.get('state')
+            
+            if state == 'awaiting_new_user_credentials':
+                original_message_id = ctx.get('message_id')
+                del user_context[chat_id]
+                parts = msg_text.split()
+                if len(parts) > 2 or (len(parts) > 0 and ' ' in parts[0]):
+                    error_msg = "❌ 格式错误。用户名不能包含空格，且用户名和密码之间只能用一个空格分隔。"
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_msg), delete_after=60)
+                    return
+                
+                username = parts[0] if len(parts) > 0 else ""
+                password = parts[1] if len(parts) > 1 else ""
+                
+                if not username:
+                     error_msg = "❌ 用户名不能为空。"
+                     safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_msg), delete_after=60)
+                     return
+
+                result_message = create_emby_user(username, password)
+                safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(result_message), delete_after=120)
+                return
+
+            if state == 'awaiting_rename_info':
+                original_message_id = ctx.get('message_id')
+                del user_context[chat_id]
+                parts = msg_text.split()
+                if len(parts) != 2 or ' ' in parts[0] or ' ' in parts[1]:
+                    error_msg = "❌ 格式错误。请输入旧用户名和新用户名，用一个空格隔开，且两者均不能包含空格。"
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_msg), delete_after=60)
+                    return
+                
+                old_username, new_username = parts
+                user_obj, error = get_emby_user_by_name(old_username)
+                if error:
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(f"❌ 操作失败: {error}"), delete_after=60)
+                    return
+                
+                result_message = rename_emby_user(user_obj['Id'], new_username)
+                safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(result_message), delete_after=120)
+                return
+
+            if state == 'awaiting_password_change_info':
+                original_message_id = ctx.get('message_id')
+                del user_context[chat_id]
+                parts = msg_text.split()
+                if len(parts) > 2 or (len(parts) > 0 and ' ' in parts[0]):
+                    error_msg = "❌ 格式错误。用户名不能包含空格，且用户名和新密码之间只能用一个空格分隔。"
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_msg), delete_after=60)
+                    return
+                
+                username = parts[0] if len(parts) > 0 else ""
+                new_password = parts[1] if len(parts) > 1 else ""
+
+                if not username:
+                     error_msg = "❌ 用户名不能为空。"
+                     safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_msg), delete_after=60)
+                     return
+
+                user_obj, error = get_emby_user_by_name(username)
+                if error:
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(f"❌ 操作失败: {error}"), delete_after=60)
+                    return
+
+                if set_emby_user_password(user_obj['Id'], new_password):
+                    result_message = f"✅ 用户 '{username}' 的密码已成功修改。"
+                else:
+                    result_message = f"❌ 修改用户 '{username}' 的密码失败。"
+                safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(result_message), delete_after=120)
+                return
+
+            if state == 'awaiting_user_to_delete':
+                original_message_id = ctx.get('message_id')
+                del user_context[chat_id]
+                username_to_delete = msg_text.strip()
+
+                emby_bot_username = (CONFIG.get('emby', {}).get('username') or "").lower()
+                if username_to_delete.lower() == emby_bot_username:
+                    error_msg = "❌ 不能删除机器人自身正在使用的管理员账户。"
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_msg), delete_after=60)
+                    return
+
+                user_obj, error = get_emby_user_by_name(username_to_delete)
+                if error:
+                    safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(f"❌ 操作失败: {error}"), delete_after=60)
+                    return
+
+                user_id_to_delete = user_obj['Id']
+                prompt_text = f"❓ 您确定要删除用户 *{escape_markdown(username_to_delete)}* \(ID: `{user_id_to_delete}`\) 吗？\n\n**此操作无法撤销！**"
+                buttons = [
+                    [{'text': '⚠️ 是的，删除', 'callback_data': f'm_userdeleteconfirm_{user_id_to_delete}_{user_id}'}],
+                    [{'text': '◀️ 返回上一级', 'callback_data': f'm_usermain_{user_id}'}]
+                ]
+                safe_edit_or_send_message(chat_id, original_message_id, prompt_text, buttons=buttons)
+                return
 
             if state == 'awaiting_message_for_session':
                 session_id_to_send = ctx['session_id']
@@ -3339,7 +3677,8 @@ def handle_telegram_command(message):
 
                 if not nfo_file:
                     error_text = f"❌ 在目录 `/{escape_markdown(os.path.join(media_type_folder, best_match_dir))}` 中未找到 .nfo 文件。"
-                    buttons = [[{'text': '◀️ 返回重试', 'callback_data': f'm_addfromcloud_dummy_{user_id}'}],[{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]]
+                    buttons = [[{'text': '◀️ 返回上一级', 'callback_data': f'm_filesmain_{user_id}'}],
+                               [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]]
                     safe_edit_or_send_message(chat_id, original_message_id, error_text, buttons=buttons, delete_after=120)
                     return
                 
@@ -3347,7 +3686,8 @@ def handle_telegram_command(message):
                 if not tmdb_id:
                     nfo_filename = os.path.basename(nfo_file)
                     error_text = f"❌ 无法从文件 `{escape_markdown(nfo_filename)}` 中解析出有效的 TMDB ID。"
-                    buttons = [[{'text': '◀️ 返回重试', 'callback_data': f'm_addfromcloud_dummy_{user_id}'}],[{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]]
+                    buttons = [[{'text': '◀️ 返回上一级', 'callback_data': f'm_filesmain_{user_id}'}],
+                               [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]]
                     safe_edit_or_send_message(chat_id, original_message_id, error_text, buttons=buttons, delete_after=120)
                     return
                 
@@ -3374,7 +3714,8 @@ def handle_telegram_command(message):
 
                 if not tmdb_details:
                     error_text = f"❌ 使用 TMDB ID `{tmdb_id}` 查询信息失败。"
-                    buttons = [[{'text': '◀️ 返回重试', 'callback_data': f'm_addfromcloud_dummy_{user_id}'}],[{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]]
+                    buttons = [[{'text': '◀️ 返回上一级', 'callback_data': f'm_filesmain_{user_id}'}],
+                               [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]]
                     safe_edit_or_send_message(chat_id, original_message_id, escape_markdown(error_text), buttons=buttons, delete_after=120)
                     return
                 
@@ -3399,7 +3740,6 @@ def handle_telegram_command(message):
 
                 buttons = [
                     [{'text': '⬇️ 确认并开始更新', 'callback_data': f'm_doupdate_{update_uuid}_{user_id}'}],
-                    [{'text': '◀️ 重新选择', 'callback_data': f'm_addfromcloud_dummy_{user_id}'}],
                     [{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}]
                 ]
                 
@@ -3423,10 +3763,10 @@ def handle_telegram_command(message):
             escape_markdown("本机器人可以帮助您与 Emby 服务器进行交互。\n\n") +
             escape_markdown("以下是您可以使用的命令：\n\n") +
             "🔍 /search" + escape_markdown(" - 在Emby媒体库中搜索电影或剧集。\n") +
-            escape_markdown("   示例：/search 流浪地球 或者 /search 凡人修仙传 2025 \n\n") +
+            escape_markdown("    示例：/search 流浪地球 或者 /search 凡人修仙传 2025 \n\n") +
             "📊 /status" + escape_markdown(" - 查看Emby服务器上的当前播放状态（仅限服务器管理员）。\n\n") +
             "⚙️ /settings" + escape_markdown(" - 进入交互式菜单以配置机器人通知和功能（仅限服务器管理员）。\n\n") +
-            "🗃️ /manage" + escape_markdown(" - 管理Emby节目和媒体文件，如更新或删除（仅限服务器管理员）。\n\n") +
+            "🗃️ /manage" + escape_markdown(" - 管理Emby节目、媒体文件和用户（仅限服务器管理员）。\n\n") +
             escape_markdown("您可以直接输入命令开始使用。")
         )
         send_telegram_notification(text=welcome_text, chat_id=chat_id, disable_preview=True)
@@ -3470,12 +3810,7 @@ def handle_telegram_command(message):
             if search_term:
                 send_manage_emby_and_format(search_term, chat_id, user_id, is_group_chat, mention)
             else:
-                prompt_message = "请选择管理节目的方式："
-                buttons = [
-                    [{'text': '🔄 管理Emby中已有的节目', 'callback_data': f'm_searchshow_dummy_{user_id}'}],
-                    [{'text': '⬇️ 从网盘更新一个新节目', 'callback_data': f'm_addfromcloud_dummy_{user_id}'}]
-                ]
-                send_deletable_telegram_notification(escape_markdown(prompt_message), chat_id=chat_id, inline_buttons=buttons, delay_seconds=120)
+                send_manage_main_menu(chat_id, user_id)
             return
 
     if command == '/search':
@@ -3671,12 +4006,13 @@ def send_manage_detail(chat_id, search_id, item_index, user_id):
             buttons.append([{'text': '➡️ 在服务器中查看', 'url': item_url}])
 
     buttons.append([{'text': '🔄 管理该节目', 'callback_data': f'm_files_{item_id}_{user_id}'}])
+    buttons.append([{'text': '↩️ 退出管理', 'callback_data': f'm_exit_dummy_{user_id}'}])
 
     send_deletable_telegram_notification(
         "\n".join(filter(None, message_parts)),
         photo_url=final_poster_url, chat_id=chat_id,
         inline_buttons=buttons if buttons else None,
-        delay_seconds=120
+        delay_seconds=180
     )
 
 def poll_telegram_updates():
@@ -3721,11 +4057,16 @@ def poll_telegram_updates():
             else:
                 print(f"❌ 轮询 Telegram 更新失败: {response.status_code} - {response.text}")
                 time.sleep(10)
+        
         except requests.exceptions.RequestException as e:
-            print(f"轮询 Telegram 时网络错误: {e}")
+            error_message = str(e)
+            if TELEGRAM_TOKEN:
+                error_message = error_message.replace(TELEGRAM_TOKEN, "[REDACTED_TOKEN]")
+            print(f"❌ 轮询 Telegram 时网络错误: {error_message}")
             time.sleep(10)
+            
         except Exception as e:
-            print(f"处理 Telegram 更新时发生未处理错误: {e}")
+            print(f"❌ 处理 Telegram 更新时发生未处理错误: {e}")
             traceback.print_exc()
             time.sleep(5)
 
