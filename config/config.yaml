@@ -118,26 +118,26 @@ settings:
   debounce_seconds: 10                      # 播放事件防抖动时间，避免频繁通知
   poster_cache_ttl_days: 7                  # TMDB海报URL的缓存有效期（天），避免重复请求
   media_base_path: /opt/Media               # Emby媒体库根目录路径
-  allowed_group_id: '-1005547757'           # 允许机器人响应命令的群组ID，如果为空则任何群组都可使用
+  allowed_group_id: '-1001560640376'           # 允许机器人响应命令的群组ID，如果为空则任何群组都可使用
 
 # =======================================================
 # Emby服务器配置
 # =======================================================
 emby:
-  server_url: http://192.168.100.1:8096      # Emby服务器的内网或外网地址
-  api_key: 027cb516e7ab1d3024cf          # Emby API密钥
-  user_id: 6031e15347023541fb949             # 用于访问Emby媒体库的用户ID
-  remote_url: https://abc.example.com:8920  # Emby外部访问地址，用于生成“在服务器中查看”链接
-  app_scheme: emby                          # Emby APP的协议名称，用于生成APP内打开链接
+  server_url: http://66.92.12.22:8096      # Emby服务器的内网或外网地址
+  api_key: 1e7d32f107694cc89d175f3c64908148          # Emby API密钥
+  user_id: d4c61213b5f84a7a902b191b96c17cd5             # 用于访问Emby媒体库的用户ID
+  remote_url: https://emby.misaya.org  # Emby外部访问地址，用于生成“在服务器中查看”链接
+  app_scheme: Emby                          # Emby APP的协议名称，用于生成APP内打开链接
 
 # =======================================================
 # Telegram机器人配置
 # =======================================================
 telegram:
-  token: 7969966:AAFYwUwrBpiHtashGGHkNBRyLC4 # Telegram机器人Token
-  group_id: '-10027355757'                   # 用于接收群组通知的群组ID
-  channel_id: '-10027657'                    # 用于接收频道通知的频道ID
-  admin_user_id: '7321438'                   # 管理员用户ID，用于接收私聊通知和执行管理命令，/status和/settings命令仅对该用户有效
+  token: 8281115662:AAEL6mlcdhyjk8v-zNvwyysTEIHTi6BxkP8 # Telegram机器人Token
+  group_id: '-1001560640376'                   # 用于接收群组通知的群组ID
+  channel_id: ''                    # 用于接收频道通知的频道ID
+  admin_user_id: '647050755'                   # 管理员用户ID，用于接收私聊通知和执行管理命令，/status和/settings命令仅对该用户有效
 
 # =======================================================
 # 第三方服务配置
