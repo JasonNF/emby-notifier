@@ -143,6 +143,6 @@ telegram:
 # 第三方服务配置
 # =======================================================
 tmdb:
-  api_token: 09afa1139bebe95cb3c4           # TMDB API密钥
+  api_token: 67d420500463e1b8152b83a078fede28           # TMDB API密钥
 proxy:
-  http_proxy: http://192.168.100.1:3333          # HTTP代理地址，如果需要访问外部服务（如TMDB、Telegram）
+  http_proxy:           # HTTP代理地址，如果需要访问外部服务（如TMDB、Telegram）
